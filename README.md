@@ -65,21 +65,20 @@ Founders typically lack:
                      ▼
 ╔══════════════════════════════════════════════════╗
 ║              REACT FRONTEND                      ║
-║          Vite + Watermelon UI  ·  Mahek          ║
+║          Vite + Watermelon UI                    ║
 ╚════════════════════╦═════════════════════════════╝
                      ║  API Calls
                      ▼
 ╔══════════════════════════════════════════════════╗
 ║              FASTAPI BACKEND                     ║
-║        Validation + Rule Engine  ·  Mayur        ║
+║        Validation + Rule Engine                  ║
 ╚═══════╦════════════╬═══════════════╦═════════════╝
         ║            ║               ║
         ▼            ▼               ▼
 ╔═══════════╗  ╔═══════════╗  ╔════════════╗
 ║ AI ENGINE ║  ║  MARKET   ║  ║   RULE     ║
-║Extraction ║  ║INTELLIGENCE║  ║  ENGINE   ║
-║  · Deep   ║  ║  · Deep   ║  ║  · Mayur  ║
-╚═════╦═════╝  ╚═════╦═════╝  ╚══════╦════╝
+║Extraction ║  ║INTELLIGENCE║ ║  ENGINE    ║
+╚═════╦═════╝  ╚═════╦═════╝  ╚══════╦════=╝
       ╚══════════════╬═══════════════╝
                      ▼
 ╔══════════════════════════════════════════════════╗
@@ -105,28 +104,28 @@ Founders typically lack:
   │  2️⃣  INPUT VALIDATION   Pydantic schemas    │
   │              │                               │
   │              ▼                               │
-  │  3️⃣  AI EXTRACTION      Raw → Structured    │ ← Deep
+  │  3️⃣  AI EXTRACTION      Raw → Structured     │
   │              │           JSON profile        │
   │              ▼                               │
-  │  4️⃣  ENTITY EXTRACTION  Keywords · Industry │ ← Deep
+  │  4️⃣  ENTITY EXTRACTION  Keywords · Industry │ 
   │              │                               │
   │              ▼                               │
-  │  5️⃣  MARKET RESEARCH    Reddit · Trends     │ ← Deep
+  │  5️⃣  MARKET RESEARCH    Reddit · Trends     │ 
   │              │           Serper · Tavily     │
   │              ▼                               │
-  │  6️⃣  RULE VALIDATION    Deterministic logic │ ← Mayur
+  │  6️⃣  RULE VALIDATION    Deterministic logic │ 
   │              │                               │
   │              ▼                               │
   │  7️⃣  SCORING ENGINE     Weighted 8-dim      │
   │              │           score calculation   │
   │              ▼                               │
-  │  8️⃣  RISK ANALYSIS      Flags + Opportunity │ ← Deep
+  │  8️⃣  RISK ANALYSIS      Flags + Opportunity │ 
   │              │                               │
   │              ▼                               │
-  │  9️⃣  SUGGESTION ENGINE  AI Recommendations  │ ← Deep
+  │  9️⃣  SUGGESTION ENGINE  AI Recommendations  │ 
   │              │                               │
   │              ▼                               │
-  │  🔟  FINAL REPORT        Dashboard + PDF     │ ← Mahek
+  │  🔟  FINAL REPORT        Dashboard + PDF     │
   └─────────────────────────────────────────────┘
 ```
 
@@ -269,6 +268,6 @@ Founders typically lack:
 
 *Turning startup chaos into structured intelligence.*
 
-**Mahek · Mayur · Deep** — Esparse Matrix Solutions · 2026
+**Deep.Mahek.Mayur** — Esparse Matrix Solutions · 2026
 
 </div>
