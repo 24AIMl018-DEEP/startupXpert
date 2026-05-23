@@ -4,3 +4,10 @@ openai
 python-dotenv
 pydantic
 google-generativeai
+sentence-transformers
+scikit-learn
+praw
+duckduckgo-search
+pytrends
+beautifulsoup4
+lxml
