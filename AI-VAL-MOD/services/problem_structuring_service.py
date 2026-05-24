@@ -27,8 +27,21 @@ Strict rules:
 - max 10 words per field
 - No explanation. No extra text. Only JSON."""
 
-        raw   = ask_llm(prompt)
-        start = raw.find("{")
-        end   = raw.rfind("}") + 1
+        for attempt in range(3):
+            try:
+                raw   = ask_llm(prompt)
+                start = raw.find("{")
+                end   = raw.rfind("}") + 1
+                if start == -1 or end == 0:
+                    continue
+                return json.loads(raw[start:end])
+            except (json.JSONDecodeError, Exception):
+                continue
 
-        return json.loads(raw[start:end])
+        # fallback if all retries fail
+        return {
+            "core_problem": problem[:60].strip(),
+            "main_pain":    "unclear from input",
+            "environment":  "unknown",
+            "target_users": "general users"
+        }

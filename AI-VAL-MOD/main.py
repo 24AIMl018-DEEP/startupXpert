@@ -1,11 +1,9 @@
 from graph.startup_graph import run_pipeline
 
-W  = 60
-W2 = 50
+W = 60
 
 PROBLEM = """
-Citizens repeatedly visit government offices because
-processes, documentation, and queues are unclear.
+People feel sad when their phone battery goes below 20%, so they want an AI-powered emotional support app that talks to them during low battery moments and motivates them until charging is available. The app would detect “battery anxiety,” generate calming conversations, and create a community of users sharing their low-battery struggles daily. It would also recommend “battery healing music” and track emotional stress caused by charging speed. The startup would target smartphone users who panic when their phone is about to die and want emotional comfort instead of just a charger.
 """
 
 print("=" * W)
@@ -39,13 +37,12 @@ print(f"  Target Users : {sp['target_users']}")
 print("\n" + "=" * W)
 print("  SEARCH QUERIES")
 print("=" * W)
-sq = state["search_queries"]
-for intent, queries in sq.items():
+for intent, queries in state["search_queries"].items():
     print(f"\n  [{intent.upper()}]")
     for i, q in enumerate(queries, 1):
         print(f"    {i}. {q}")
 
-# ── EVIDENCE COUNTS ───────────────────────────────────────
+# ── EVIDENCE ──────────────────────────────────────────────
 print("\n" + "=" * W)
 print("  EVIDENCE")
 print("=" * W)
@@ -59,85 +56,43 @@ for intent in ["problem", "behavior", "spending"]:
     print(f"\n  [{intent.upper()}]")
     print(f"    Raw: {raw}  |  Cleaned: {cleaned}  |  Clusters: {cluster}")
 
-# ── PER INTENT INTELLIGENCE ───────────────────────────────
-for intent in ["problem", "behavior", "spending"]:
-
-    print("\n" + "=" * W)
-    print(f"  [{intent.upper()} INTELLIGENCE]")
-    print("=" * W)
-
-    rm = state["intelligence"].get(f"{intent}_raw_market", {})
-    rv = state["intelligence"].get(f"{intent}_market", {})
-    ci = state["intelligence"].get(f"{intent}_cluster_intelligence", {})
-    pr = state["intelligence"].get(f"{intent}_reasoning", {})
-
-    print(f"\n  Discussion Volume : {rm.get('discussion_volume', 0)}")
-    print(f"  Market Demand     : {rm.get('market_demand', 0)}")
-    print(f"  Pain Intensity    : {rv.get('pain_intensity', 0)}")
-    print(f"  Cluster Strength  : {ci.get('cluster_strength', 0)}")
-    print(f"  Unique Patterns   : {ci.get('unique_patterns', 0)}")
-
-    print(f"\n  Extracted Pain Signals:")
-    for p in rv.get("extracted_pains", [])[:3]:
-        print(f"    [{p['size']}]  {p['pain_signal'][:90]}")
-
-    print(f"\n  Root Frustrations:")
-    for r in pr.get("root_frustrations", [])[:3]:
-        print(f"    - {r[:90]}")
-
-    print(f"\n  Hidden Pains:")
-    for h in pr.get("hidden_pains", [])[:2]:
-        print(f"    - {h[:90]}")
-
-    print(f"\n  Opportunity Gaps:")
-    for o in pr.get("opportunity_gaps", [])[:2]:
-        print(f"    - {o[:90]}")
-
-# ── COMPRESSED INTELLIGENCE ──────────────────────────────
+# ── COMPRESSED INTELLIGENCE ───────────────────────────────
 print("\n" + "=" * W)
 print("  COMPRESSED INTELLIGENCE")
 print("=" * W)
 ci = state["intelligence"].get("compressed", {})
 
-for intent in ["problem", "behavior", "spending"]:
-    s = ci.get(f"{intent}_summary", {})
-    if not s:
+print(f"\n  Top Pains:")
+for p in ci.get("top_pains", []):
+    print(f"    - {p}")
+
+print(f"\n  Behavior Patterns:")
+for p in ci.get("behavior_patterns", []):
+    print(f"    - {p}")
+
+print(f"\n  Spending Patterns:")
+for p in ci.get("spending_patterns", []):
+    print(f"    - {p}")
+
+print(f"\n  Sentiment Per Cluster:")
+for intent, sent_key in [
+    ("PROBLEM",  "problem_sentiment"),
+    ("BEHAVIOR", "behavior_sentiment"),
+    ("SPENDING", "spending_sentiment")
+]:
+    sentiments = ci.get(sent_key, [])
+    if not sentiments:
         continue
-    print(f"\n  [{intent.upper()}]")
-    print(f"  Total Evidence  : {s.get('total_evidence', 0)}")
-    print(f"  Clustered       : {s.get('clustered_count', 0)}  ({s.get('coverage_ratio', 0)} coverage)")
-    print(f"  Market Severity : {s.get('market_severity', 0)}")
-    print(f"  Strongest Pain  : {s.get('strongest_pain', '')[:100]}")
-    print(f"  Dominant Patterns:")
-    for p in s.get("dominant_patterns", [])[:3]:
-        print(f"    [{p['frequency']}] [{p['core_emotion']}] {p['key_phrase']}")
-        print(f"      {p['centroid'][:100]}")
+    print(f"\n  [{intent}]")
+    for i, sent in enumerate(sentiments, 1):
+        print(f"    {i}. {sent.get('label')} ({sent.get('score')})") 
 
-exec_ctx = ci.get("executive_context", {})
-print(f"\n  Pain-Spending Overlap : {exec_ctx.get('pain_spending_overlap', 0)}")
-print(f"  Strongest Signal      : {exec_ctx.get('strongest_signal', '')[:100]}")
-print(f"  Opportunity Zones:")
-for oz in exec_ctx.get("opportunity_zones", [])[:3]:
-    print(f"    [{oz['overlap']}] Pain: {oz['pain'][:60]}")
-    print(f"           Spend: {oz['spending'][:60]}")
-
+# ── FOUNDER INTELLIGENCE REPORT ───────────────────────────
 print("\n" + "=" * W)
-print("  FINAL STARTUP VERDICT")
+print("  FOUNDER INTELLIGENCE REPORT")
 print("=" * W)
-fs = state.get("reasoning", {}).get("final_summary", {})
-
-print(f"\n  VERDICT   : {fs.get('market_verdict')}")
-print(f"  REASON    : {fs.get('verdict_reason')}")
-print(f"\n  Pain      : {fs.get('pain_assessment')}")
-print(f"  Behavior  : {fs.get('behavior_assessment')}")
-print(f"  Spending  : {fs.get('spending_assessment')}")
-print(f"\n  Opportunity:")
-print(f"  {fs.get('opportunity_statement')}")
-print(f"\n  Key Risks:")
-for r in fs.get("key_risks", []):
-    print(f"    - {r}")
-print(f"\n  Recommended Focus:")
-print(f"  {fs.get('recommended_focus')}")
+report = state.get("reasoning", {}).get("founder_report", "")
+print(f"\n{report}\n")
 
 print("\n" + "=" * W)
 print("  DONE")

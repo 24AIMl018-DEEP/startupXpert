@@ -15,52 +15,57 @@ class UnderstandingState(TypedDict, total=False):
 
 class EvidenceState(TypedDict, total=False):
     # raw per intent
-    raw:               List[str]
-    problem:           List[str]
-    behavior:          List[str]
-    spending:          List[str]
+    raw:                List[str]
+    problem:            List[str]
+    behavior:           List[str]
+    spending:           List[str]
     # cleaned per intent
-    problem_cleaned:   List[Dict[str, Any]]
-    behavior_cleaned:  List[Dict[str, Any]]
-    spending_cleaned:  List[Dict[str, Any]]
+    problem_cleaned:    List[Dict[str, Any]]
+    behavior_cleaned:   List[Dict[str, Any]]
+    spending_cleaned:   List[Dict[str, Any]]
     # clustered per intent
     problem_clustered:  List[Dict[str, Any]]
     behavior_clustered: List[Dict[str, Any]]
     spending_clustered: List[Dict[str, Any]]
 
 
+class ClusterSummary(TypedDict, total=False):
+    summary:   str                  # LLM one-sentence summary
+    sentiment: Dict[str, Any]       # {label: positive/neutral/negative, score: float}
+    size:      int                  # number of evidence items in cluster
+
+
+class CompressedState(TypedDict, total=False):
+    # LLM summaries per intent
+    top_pains:          List[str]
+    behavior_patterns:  List[str]
+    spending_patterns:  List[str]
+    # sentiment per cluster per intent
+    problem_sentiment:  List[Dict[str, Any]]
+    behavior_sentiment: List[Dict[str, Any]]
+    spending_sentiment: List[Dict[str, Any]]
+    # full cluster details
+    problem_clusters:   List[ClusterSummary]
+    behavior_clusters:  List[ClusterSummary]
+    spending_clusters:  List[ClusterSummary]
+
+
 class IntelligenceState(TypedDict, total=False):
-    # raw market per intent
-    problem_raw_market:            Dict[str, Any]
-    behavior_raw_market:           Dict[str, Any]
-    spending_raw_market:           Dict[str, Any]
-    # relevant market per intent
-    problem_market:                Dict[str, Any]
-    behavior_market:               Dict[str, Any]
-    spending_market:               Dict[str, Any]
-    # cluster intelligence per intent
-    problem_cluster_intelligence:  Dict[str, Any]
-    behavior_cluster_intelligence: Dict[str, Any]
-    spending_cluster_intelligence: Dict[str, Any]
-    # pain reasoning per intent
-    problem_reasoning:             Dict[str, Any]
-    behavior_reasoning:            Dict[str, Any]
-    spending_reasoning:            Dict[str, Any]
-    # compression layer
-    compressed:                    Dict[str, Any]
+    compressed: CompressedState
 
 
 class ReasoningState(TypedDict, total=False):
-    final_summary: Dict[str, Any]
+    founder_report: str          # conversational LLM startup analysis
+    final_summary:  Dict[str, Any]
 
 
 # ── MAIN STATE ────────────────────────────────────────────
 
 class StartupState(TypedDict, total=False):
 
-    problem:        str
+    problem:       str
 
-    understanding:  UnderstandingState
-    evidence:       EvidenceState
-    intelligence:   IntelligenceState
-    reasoning:      ReasoningState
+    understanding: UnderstandingState
+    evidence:      EvidenceState
+    intelligence:  IntelligenceState
+    reasoning:     ReasoningState

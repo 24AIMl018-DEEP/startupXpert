@@ -52,21 +52,26 @@ Strict rules:
 - No tutorial, educational or informational queries
 - No explanation. No extra text. Only JSON."""
 
-        raw    = ask_llm(prompt)
-        start  = raw.find("{")
-        end    = raw.rfind("}") + 1
-        result = json.loads(raw[start:end])
+        for attempt in range(3):
+            try:
+                raw   = ask_llm(prompt)
+                start = raw.find("{")
+                end   = raw.rfind("}") + 1
+                if start == -1 or end == 0:
+                    continue
+                result = json.loads(raw[start:end])
+                return {
+                    "problem_queries":  result.get("problem_queries", []),
+                    "behavior_queries": result.get("behavior_queries", []),
+                    "spending_queries": result.get("spending_queries", [])
+                }
+            except (json.JSONDecodeError, Exception):
+                continue
 
+        # fallback
+        base = sp['core_problem']
         return {
-            "problem_queries":  result.get("problem_queries", []),
-            "behavior_queries": result.get("behavior_queries", []),
-            "spending_queries": result.get("spending_queries", [])
+            "problem_queries":  [f"{base} complaints", f"{base} frustration", f"hate {base}"],
+            "behavior_queries": [f"{base} workaround", f"how people deal with {base}"],
+            "spending_queries": [f"{base} cost", f"paying to solve {base}"]
         }
-
-
-        raw    = ask_llm(prompt)
-        start  = raw.find("{")
-        end    = raw.rfind("}") + 1
-        result = json.loads(raw[start:end])
-
-        return result["queries"]

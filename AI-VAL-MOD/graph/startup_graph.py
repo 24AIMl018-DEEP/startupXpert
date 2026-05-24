@@ -1,18 +1,15 @@
 from langgraph.graph import StateGraph, START, END
 from typing import TypedDict, Dict, Any
 
-from nodes.genre_node                import genre_node
-from nodes.structure_node            import structure_node
-from nodes.query_node                import query_node
-from nodes.evidence_node             import evidence_node
-from nodes.cleaning_node             import cleaning_node
-from nodes.clustering_node           import clustering_node
+from nodes.genre_node                    import genre_node
+from nodes.structure_node                import structure_node
+from nodes.query_node                    import query_node
+from nodes.evidence_node                 import evidence_node
+from nodes.cleaning_node                 import cleaning_node
+from nodes.clustering_node               import clustering_node
 from nodes.compression_intelligence_node import compression_intelligence_node
-from nodes.raw_market_node           import raw_market_node
-from nodes.relevant_market_node      import relevant_market_node
-from nodes.cluster_intelligence_node import cluster_intelligence_node
-from nodes.pain_reasoning_node       import pain_reasoning_node
-from nodes.final_summary_node        import final_summary_node
+from nodes.founder_intelligence_node     import founder_intelligence_node
+
 
 
 # ── STATE ─────────────────────────────────────────────────
@@ -37,32 +34,24 @@ def build_graph():
 
     graph = StateGraph(PipelineState)
 
-    graph.add_node("genre",                genre_node)
-    graph.add_node("structure",            structure_node)
-    graph.add_node("query",                query_node)
-    graph.add_node("evidence",             evidence_node)
-    graph.add_node("cleaning",             cleaning_node)
-    graph.add_node("clustering",              clustering_node)
+    graph.add_node("genre",                    genre_node)
+    graph.add_node("structure",                structure_node)
+    graph.add_node("query",                    query_node)
+    graph.add_node("evidence",                 evidence_node)
+    graph.add_node("cleaning",                 cleaning_node)
+    graph.add_node("clustering",               clustering_node)
     graph.add_node("compression_intelligence", compression_intelligence_node)
-    graph.add_node("raw_market",               raw_market_node)
-    graph.add_node("relevant_market",      relevant_market_node)
-    graph.add_node("cluster_intelligence", cluster_intelligence_node)
-    graph.add_node("pain_reasoning",   pain_reasoning_node)
-    graph.add_node("final_summary",     final_summary_node)
+    graph.add_node("founder_intelligence",     founder_intelligence_node)
 
-    graph.add_edge(START,               "genre")
-    graph.add_edge("genre",             "structure")
-    graph.add_edge("structure",         "query")
-    graph.add_edge("query",             "evidence")
-    graph.add_edge("evidence",          "cleaning")
-    graph.add_edge("cleaning",          "clustering")
-    graph.add_edge("clustering",              "compression_intelligence")
-    graph.add_edge("compression_intelligence", "raw_market")
-    graph.add_edge("raw_market",        "relevant_market")
-    graph.add_edge("relevant_market",      "cluster_intelligence")
-    graph.add_edge("cluster_intelligence", "pain_reasoning")
-    graph.add_edge("pain_reasoning",   "final_summary")
-    graph.add_edge("final_summary",     END)
+    graph.add_edge(START,                      "genre")
+    graph.add_edge("genre",                    "structure")
+    graph.add_edge("structure",                "query")
+    graph.add_edge("query",                    "evidence")
+    graph.add_edge("evidence",                 "cleaning")
+    graph.add_edge("cleaning",                 "clustering")
+    graph.add_edge("clustering",               "compression_intelligence")
+    graph.add_edge("compression_intelligence", "founder_intelligence")
+    graph.add_edge("founder_intelligence",     END)
 
     return graph.compile()
 
@@ -80,10 +69,8 @@ def run_pipeline(problem: str) -> dict:
         "reasoning":    {}
     }
 
-    final = None
     for step in app.stream(state, stream_mode="updates"):
         node_name = list(step.keys())[0]
         print(f"    [{node_name}] done")
-        final = step
 
     return app.invoke(state)

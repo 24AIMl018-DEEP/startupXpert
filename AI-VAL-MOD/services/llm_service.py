@@ -11,19 +11,13 @@ client = OpenAI(
 )
 
 
-def ask_llm(prompt):
+def ask_llm(prompt, max_tokens=1024):
     
-    # respose taken from llm
     response = client.chat.completions.create(
         model="meta/llama-3.1-8b-instruct",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ],
+        messages=[{"role": "user", "content": prompt}],
         temperature=0.7,
-        max_tokens=500
+        max_tokens=max_tokens
     )
 
     return response.choices[0].message.content

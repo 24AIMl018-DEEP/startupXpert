@@ -41,14 +41,18 @@ class CompressionService:
 
         for label, items in clusters.items():
 
-            # best evidence in cluster
-            best_item = max(items, key=lambda x: x['relevance_score'])
+            # sort by relevance — top posts first
+            items_sorted = sorted(items, key=lambda x: x['relevance_score'], reverse=True)
+
+            best_item  = items_sorted[0]
+            top_posts  = [i['text'] for i in items_sorted[:5]]  # top 3 posts per cluster
 
             compressed.append({
-                "cluster_id":           int(label),
-                "cluster_size":         len(items),
-                "representative_text":  best_item['text'],
-                "relevance_score":      best_item['relevance_score']
+                "cluster_id":          int(label),
+                "cluster_size":        len(items),
+                "representative_text": best_item['text'],
+                "relevance_score":     best_item['relevance_score'],
+                "top_posts":           top_posts
             })
 
         # Sorting
