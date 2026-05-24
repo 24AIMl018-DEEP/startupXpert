@@ -1,46 +1,30 @@
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
-from states.startup_state import StartupState
-from agents.base_agent import BaseAgent
 
 
-class GenreAgent(BaseAgent):
+class GenreService:
 
     def __init__(self):
 
         self.model = SentenceTransformer("all-MiniLM-L6-v2")
 
         self.genres = [
-
             "serious medical, disease, infection, or healthcare related problems affecting human health",
-
             "payment fraud, financial loss, or money management problems",
-
             "workflow inefficiency, time waste, or productivity problems",
-
             "human relationship, social connection, or communication problems",
-
             "public hygiene and cleanliness discomfort problems",
-
             "daily convenience, small lifestyle friction, or comfort improvement problems",
-
             "transportation, commuting, or logistics problems",
-
             "mental stress, emotional wellbeing, or psychological problems",
-
             "privacy, data security, or digital safety problems",
-
             "education, skill learning, or knowledge access problems"
-
         ]
 
         self.genre_embeddings = self.model.encode(self.genres)
 
-    def run(self, state: StartupState) -> StartupState:
+    def run(self, problem: str) -> dict:
 
-        problem = state["problem"]
-
-        # Enriched semantic context for stronger embedding signal
         problem_context = f"""
 Startup Problem:
 {problem}
@@ -59,16 +43,13 @@ or operational issue.
         # Top-3 genres
         top_indices = similarities.argsort()[-3:][::-1]
 
-        top_genres = []
+        top_genres = [
+            {"genre": self.genres[idx], "score": round(float(similarities[idx]), 3)}
+            for idx in top_indices
+        ]
 
-        for idx in top_indices:
-            top_genres.append({
-                "genre": self.genres[idx],
-                "score": round(float(similarities[idx]), 3)
-            })
-
-        state["top_genres"] = top_genres
-        state["genre"] = top_genres[0]["genre"]
-        state["confidence_score"] = top_genres[0]["score"]
-
-        return state
+        return {
+            "top_genres":       top_genres,
+            "genre":            top_genres[0]["genre"],
+            "confidence_score": top_genres[0]["score"]
+        }
