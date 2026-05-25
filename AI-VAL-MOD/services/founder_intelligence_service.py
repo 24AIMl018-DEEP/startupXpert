@@ -1,142 +1,109 @@
 import re
 import time
 from services.llm_service import ask_llm
+from services.embedding_service import clean_text
 
 
 class FounderIntelligenceService:
 
-    def clean_text(self, text: str) -> str:
-        text = re.sub(r'TITLE:\s*', '', text)
-        text = re.sub(r'CONTENT:\s*', '', text)
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text
-
-    # ── EXTRACT RELEVANT QUOTES FROM CLUSTER ─────────────────
-    # picks 2 short human-sounding snippets from cluster evidence
-
-    def extract_quotes(self, clustered_item: dict, all_cleaned: list) -> list:
-        rep   = self.clean_text(clustered_item.get("representative_text", ""))
-        score = clustered_item.get("relevance_score", 0)
-
-        # find top 2 relevant cleaned items near this cluster's score
-        nearby = sorted(
-            [e for e in all_cleaned if isinstance(e, dict)],
-            key=lambda x: abs(x.get("relevance_score", 0) - score)
-        )[:2]
-
+    def extract_quotes(self, cluster: dict) -> list:
         quotes = []
-        for item in nearby:
-            t = self.clean_text(item.get("text", ""))
-            # take first meaningful sentence only
-            sentences = re.split(r'[.!?]', t)
-            for s in sentences:
+        for post in cluster.get("top_posts", [])[:2]:
+            t = clean_text(post)
+            for s in re.split(r'[.!?]', t):
                 s = s.strip()
                 if len(s) > 30:
                     quotes.append(s[:120])
                     break
+        return quotes
 
-        return quotes[:2]
-
-    # ── BUILD MARKET SIGNALS ──────────────────────────────────
-    # converts compressed clusters into narrative signal objects
-
-    def build_market_signals(self, compressed: dict, evidence: dict) -> list:
+    def build_market_signals(self, compressed: dict) -> list:
         signals = []
-
-        intent_map = [
-            ("pain",     "problem_clusters",  "problem_cleaned",  "frustration"),
-            ("behavior", "behavior_clusters", "behavior_cleaned", "adaptation"),
-            ("spending", "spending_clusters", "spending_cleaned", "economic_intent"),
-        ]
-
-        for signal_type, cluster_key, cleaned_key, emotion in intent_map:
-            clusters = compressed.get(cluster_key, [])
-            cleaned  = evidence.get(cleaned_key, [])
-
-            for cluster in clusters[:3]:  # top 3 per intent
-                summary = cluster.get("summary", "")
-                if not summary:
+        for intent, cluster_key, emotion in [
+            ("pain",     "problem_clusters",  "frustration"),
+            ("behavior", "behavior_clusters", "adaptation"),
+            ("spending", "spending_clusters", "economic_intent")
+        ]:
+            for cluster in compressed.get(cluster_key, [])[:3]:
+                if not cluster.get("summary"):
                     continue
-
-                quotes    = self.extract_quotes(cluster, cleaned)
-                sentiment = cluster.get("sentiment", {})
-
                 signals.append({
-                    "type":      signal_type,
-                    "summary":   summary,
-                    "quotes":    quotes,
-                    "emotion":   emotion,
-                    "sentiment": sentiment.get("label", "neutral"),
-                    "size":      cluster.get("size", 1)
+                    "type":          intent,
+                    "summary":       cluster["summary"],
+                    "quotes":        self.extract_quotes(cluster),
+                    "emotion":       emotion,
+                    "sentiment":     cluster.get("sentiment", {}).get("label", "neutral"),
+                    "size":          cluster.get("size", 1),
+                    "keywords":      cluster.get("top_keywords", []),
+                    "competitors":   cluster.get("top_competitors", []),
+                    "urgency":       cluster.get("urgency_count", 0),
+                    "workarounds":   cluster.get("workaround_count", 0),
+                    "spending":      cluster.get("spending_count", 0)
                 })
-
-        # sort by size — strongest signals first
         return sorted(signals, key=lambda x: x["size"], reverse=True)
 
-    # ── BUILD PROMPT ──────────────────────────────────────────
-
-    def build_prompt(self, problem: str, structured: dict, signals: list) -> str:
-
-        # format signals as readable context — not JSON dump
+    def build_prompt(self, problem: str, signals: list) -> str:
         signal_text = ""
-        for s in signals[:8]:  # max 8 signals to stay within token limit
-            signal_text += f"\n[{s['type'].upper()} — {s['emotion']} — sentiment: {s['sentiment']}]\n"
+        for s in signals[:8]:
+            signal_text += f"\n[{s['type'].upper()} — {s['emotion']} — {s['sentiment']}]\n"
             signal_text += f"{s['summary']}\n"
+            if s["keywords"]:
+                signal_text += f"  Keywords: {', '.join(s['keywords'])}\n"
+            if s["competitors"]:
+                signal_text += f"  Competitors: {', '.join(s['competitors'])}\n"
+            if s["urgency"]:
+                signal_text += f"  Urgency signals: {s['urgency']}\n"
+            if s["workarounds"]:
+                signal_text += f"  Workaround signals: {s['workarounds']}\n"
+            if s["spending"]:
+                signal_text += f"  Spending signals: {s['spending']}\n"
             for q in s["quotes"]:
                 signal_text += f'  > "{q}"\n'
 
-        prompt = f"""You are an experienced startup advisor analyzing real internet behavior around a founder's idea.
+        return f"""You are a startup advisor giving a direct, honest assessment to a founder.
 
-The following signals were extracted from actual online discussions, complaints, workarounds, and user conversations — not surveys or assumptions.
+These signals were extracted from real internet discussions — not surveys.
 
 FOUNDER'S PROBLEM:
 {problem.strip()}
 
-WHAT THE INTERNET IS SAYING:
+MARKET SIGNALS FROM THE INTERNET:
 {signal_text}
 
-Your task is to deeply understand what is really happening in this market.
+Give a direct, honest startup assessment. Structure your response naturally but make sure you cover:
+1. Should they build this? (clear yes/no with one-line reason)
+2. What is the strongest signal from the data?
+3. What is the biggest risk or weakness?
+4. What behavior pattern is most interesting?
+5. What should the founder validate or do next?
 
-Think like a YC partner having a candid conversation with a founder.
-You may reference the quotes naturally.
-You may challenge weak assumptions.
-You may identify unexpected patterns.
-Connect the emotional signals with the behavioral ones.
-If spending signals exist, explain what they reveal about willingness to pay.
-
-Do NOT follow a rigid format.
-Do NOT mention clusters, embeddings, scores, or AI analysis.
-Do NOT be robotic or use bullet points unless it feels natural.
-
-Respond conversationally and insightfully — like ChatGPT giving real startup advice."""
-
-        return prompt
-
-    # ── MAIN ──────────────────────────────────────────────────
+Rules:
+- Reference actual quotes and signals from above
+- Challenge weak assumptions directly
+- If competitors are mentioned, explain what that means
+- If workarounds exist, explain what that reveals about urgency
+- Do NOT mention clusters, embeddings, scores, or AI
+- Do NOT use filler phrases like "I love diving into" or "fascinating"
+- Be direct like a YC partner, not a consultant writing a report
+- Max 400 words"""
 
     def analyze(self, state: dict) -> str:
-
         problem    = state.get("problem", "")
-        structured = state.get("structured_problem", {})
         compressed = state.get("intelligence", {}).get("compressed", {})
-        evidence   = state.get("evidence", {})
-
-        signals = self.build_market_signals(compressed, evidence)
+        signals    = self.build_market_signals(compressed)
 
         if not signals:
             return "Not enough market signals collected to generate analysis."
 
-        prompt = self.build_prompt(problem, structured, signals)
+        prompt = self.build_prompt(problem, signals)
 
-        # rate limit safe — single call with retry
         for attempt in range(3):
             try:
-                time.sleep(attempt * 2)  # backoff on retry
+                time.sleep(attempt * 2)
                 result = ask_llm(prompt, max_tokens=1024)
                 if result and len(result) > 100:
                     return result.strip()
             except Exception as e:
                 print(f"    [founder_intelligence] retry {attempt + 1}: {e}")
-                continue
 
         return "Analysis could not be generated. Please retry."

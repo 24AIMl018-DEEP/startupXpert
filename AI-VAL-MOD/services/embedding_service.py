@@ -1,6 +1,6 @@
+import re
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity as _cosine
-import numpy as np
 
 _model = None
 
@@ -12,15 +12,6 @@ def get_model():
     return _model
 
 
-def embed_text(text: str):
-    return get_model().encode(text)
-
-
-def embed_batch(texts: list):
-    return get_model().encode(texts)
-
-
-# aliases used by cleaning_service
 def encode(texts):
     return get_model().encode(texts)
 
@@ -29,9 +20,8 @@ def cosine_similarity(a, b):
     return _cosine(a, b)
 
 
-def similarity(emb_a, emb_b) -> float:
-    return float(_cosine([emb_a], [emb_b])[0][0])
-
-
-def average_embedding(embeddings):
-    return np.mean(embeddings, axis=0)
+def clean_text(text: str) -> str:
+    text = re.sub(r'TITLE:\s*', '', text)
+    text = re.sub(r'CONTENT:\s*', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
