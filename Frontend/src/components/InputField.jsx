@@ -27,8 +27,11 @@ const InputField = ({
     <div className="w-full text-left space-y-1.5">
       {/* Label */}
       {label && (
-        <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400">
-          {label} {required && <span className="text-red-500">*</span>}
+        <label 
+          htmlFor={name}
+          className="block text-xs font-semibold uppercase tracking-wider text-gray-400 focus:outline-none"
+        >
+          {label} {required && <span className="text-red-500" aria-hidden="true">*</span>}
         </label>
       )}
 
@@ -36,20 +39,26 @@ const InputField = ({
       <div className="relative w-full">
         {type === 'textarea' ? (
           <textarea
+            id={name}
             name={name}
             value={value}
             onChange={onChange}
             placeholder={placeholder}
             rows={rows}
-            className={`${baseInputStyles} resize-none`}
+            className={`${baseInputStyles} resize-none focus:ring-2 focus:ring-indigo-500`}
+            aria-required={required}
+            aria-invalid={isError}
           />
         ) : type === 'select' ? (
           <div className="relative">
             <select
+              id={name}
               name={name}
               value={value}
               onChange={onChange}
-              className={`${baseInputStyles} appearance-none cursor-pointer pr-10`}
+              className={`${baseInputStyles} appearance-none cursor-pointer pr-10 focus:ring-2 focus:ring-indigo-500`}
+              aria-required={required}
+              aria-invalid={isError}
             >
               {placeholder && <option value="" disabled className="text-gray-700 bg-[#0a0a0f]">{placeholder}</option>}
               {options.map((opt) => (
@@ -64,12 +73,15 @@ const InputField = ({
         ) : (
           <div className="relative">
             <input
+              id={name}
               type={type === 'password' && showPassword ? 'text' : type}
               name={name}
               value={value}
               onChange={onChange}
               placeholder={placeholder}
-              className={baseInputStyles}
+              className={`${baseInputStyles} focus:ring-2 focus:ring-indigo-500`}
+              aria-required={required}
+              aria-invalid={isError}
             />
             
             {/* Show/Hide password toggle */}

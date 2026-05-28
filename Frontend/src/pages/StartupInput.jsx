@@ -42,8 +42,7 @@ const StartupInput = () => {
   ];
 
   const handleAnalyzeClick = () => {
-    runAnalysis();
-    setHasRun(true);
+    navigate('/analysis/loader');
   };
 
   const getStatusStyles = (status) => {
