@@ -4,8 +4,8 @@ import { useStartup } from '../context/StartupContext';
 import { 
   LayoutDashboard, 
   Briefcase, 
-  Milestone, 
-  FileText, 
+  Clock, 
+  User, 
   Settings, 
   LogOut, 
   Sparkles,
@@ -15,6 +15,7 @@ import {
 const Sidebar = ({ activeTab, setActiveTab }) => {
   const { logoutUser, user } = useStartup();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleLogout = () => {
     logoutUser();
@@ -22,15 +23,44 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
   };
 
   const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'startups', label: 'My Startups', icon: Briefcase },
-    { id: 'roadmap', label: 'Roadmap', icon: Milestone },
-    { id: 'documents', label: 'Documents', icon: FileText },
-    { id: 'settings', label: 'Settings', icon: Settings },
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard, path: '/dashboard' },
+    { id: 'startups', label: 'My Startups', icon: Briefcase, path: '/dashboard' },
+    { id: 'history', label: 'Analysis History', icon: Clock, path: '/dashboard' },
+    { id: 'profile', label: 'Profile', icon: User, path: '/profile' },
+    { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
   ];
 
+  // Determine which item is selected based on route path or active tab
+  const getIsSelected = (item) => {
+    if (item.path === '/profile' && location.pathname === '/profile') {
+      return true;
+    }
+    if (item.path === '/settings' && location.pathname === '/settings') {
+      return true;
+    }
+    if (location.pathname === '/dashboard' && activeTab === item.id) {
+      return true;
+    }
+    return false;
+  };
+
+  const handleNavClick = (item) => {
+    if (item.path === '/profile') {
+      navigate('/profile');
+    } else if (item.path === '/settings') {
+      navigate('/settings');
+    } else {
+      // It's a dashboard tab: overview, startups, history
+      if (location.pathname === '/dashboard' && setActiveTab) {
+        setActiveTab(item.id);
+      } else {
+        navigate('/dashboard', { state: { activeTab: item.id } });
+      }
+    }
+  };
+
   return (
-    <aside className="w-80 border-r border-indigo-500/10 bg-[#0a0a0f]/90 flex flex-col justify-between p-6">
+    <aside className="w-80 border-r border-indigo-500/10 bg-[#0a0a0f]/90 flex flex-col justify-between p-6 shrink-0">
       <div className="space-y-8">
         {/* Brand */}
         <div className="flex items-center gap-2 px-2">
@@ -54,18 +84,12 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
         <nav className="space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isSelected = activeTab === item.id;
+            const isSelected = getIsSelected(item);
             
             return (
               <button
                 key={item.id}
-                onClick={() => {
-                  if (item.id === 'overview') {
-                    setActiveTab('overview');
-                  } else {
-                    setActiveTab(item.id);
-                  }
-                }}
+                onClick={() => handleNavClick(item)}
                 className={`w-full flex items-center justify-between px-4 py-3.5 rounded-lg text-sm font-medium transition-all duration-300 group ${
                   isSelected 
                     ? 'bg-indigo-600/15 border border-indigo-500/30 text-white shadow-[0_0_15px_rgba(99,102,241,0.1)]' 

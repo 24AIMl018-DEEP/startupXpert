@@ -1,13 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useStartup } from '../context/StartupContext';
 import Navbar from '../components/Navbar';
 import InputField from '../components/InputField';
-import { Sparkles, ArrowRight, UserCheck } from 'lucide-react';
+import { Sparkles, ArrowRight, UserCheck, CheckCircle2, AlertCircle } from 'lucide-react';
 
 const Register = () => {
-  const { registerUser } = useStartup();
+  const { registerUser, isLoggedIn, setLoading } = useStartup();
   const navigate = useNavigate();
+
+  // Redirect authenticated sessions immediately (Auth Redirect)
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isLoggedIn, navigate]);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -20,6 +27,7 @@ const Register = () => {
 
   const [errors, setErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
@@ -34,10 +42,51 @@ const Register = () => {
     setFormData((prev) => ({ ...prev, role: selectedRole }));
   };
 
+  // Strong Password Checklist Evaluations
+  const password = formData.password;
+  const pCheck = {
+    length: password.length >= 8,
+    uppercase: /[A-Z]/.test(password),
+    lowercase: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[@#$%&*!?]/.test(password)
+  };
+
+  const satisfiedCount = Object.values(pCheck).filter(Boolean).length;
+  const isPasswordValid = satisfiedCount === 5;
+
+  // Strength Meter Computations
+  let strengthText = 'Weak';
+  let strengthColor = 'w-1/3 bg-rose-500';
+  let strengthTextColor = 'text-rose-400';
+
+  if (password.length > 0) {
+    if (satisfiedCount === 5) {
+      strengthText = 'Strong';
+      strengthColor = 'w-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]';
+      strengthTextColor = 'text-emerald-400';
+    } else if (satisfiedCount >= 3) {
+      strengthText = 'Medium';
+      strengthColor = 'w-2/3 bg-amber-500';
+      strengthTextColor = 'text-amber-400';
+    }
+  }
+
+  // Password matching check
+  const passwordsMatch = formData.password === formData.confirmPassword && formData.confirmPassword.length > 0;
+  const confirmPasswordFilled = formData.confirmPassword.length > 0;
+
+  // Verify form completeness for active submit enablement
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const isFormValid = 
+    formData.fullName.trim().length > 0 &&
+    emailRegex.test(formData.email) &&
+    isPasswordValid &&
+    passwordsMatch;
+
   // Custom Validations
   const validateForm = () => {
     const newErrors = {};
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!formData.fullName.trim()) {
       newErrors.fullName = 'Full name is required';
@@ -49,13 +98,11 @@ const Register = () => {
       newErrors.email = 'Please enter a valid email address';
     }
 
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters long';
+    if (!isPasswordValid) {
+      newErrors.password = 'Password does not meet strong security guidelines';
     }
 
-    if (formData.password !== formData.confirmPassword) {
+    if (!passwordsMatch) {
       newErrors.confirmPassword = 'Passwords do not match';
     }
 
@@ -68,17 +115,20 @@ const Register = () => {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
+    setLoading(true);
 
     // Simulate standard latency
     setTimeout(() => {
       registerUser(formData.fullName, formData.email, formData.role);
+      setLoading(false);
       setIsSubmitting(false);
       navigate('/onboarding/role');
     }, 1200);
   };
 
   return (
-    <div className="relative min-h-screen bg-[#0a0a0f] flex flex-col justify-between overflow-hidden">
+    <div className="relative min-h-screen bg-[#0a0a0f] flex flex-col justify-between overflow-x-hidden text-white font-sans transition-all duration-300">
+      
       {/* Background orbs */}
       <div className="absolute top-1/4 right-1/4 h-[350px] w-[350px] translate-x-1/2 -translate-y-1/2 rounded-full bg-indigo-500/10 blur-[80px] pointer-events-none"></div>
       
@@ -86,6 +136,7 @@ const Register = () => {
 
       <main className="flex-grow flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="w-full max-w-lg space-y-8 rounded-2xl border border-indigo-500/10 bg-[#0e0e16]/80 p-8 shadow-[0_0_50px_rgba(0,0,0,0.5)] backdrop-blur-md">
+          
           {/* Header */}
           <div className="text-center space-y-2">
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/5 text-indigo-400">
@@ -100,7 +151,7 @@ const Register = () => {
           </div>
 
           {/* Form */}
-          <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+          <form className="mt-8 space-y-5" onSubmit={handleSubmit} noValidate>
             
             {/* Full Name */}
             <InputField
@@ -152,39 +203,103 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Password */}
+            {/* Password Fields with inline validators */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <InputField
-                label="Password"
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                error={errors.password}
-                togglePassword={() => setShowPassword(!showPassword)}
-                showPassword={showPassword}
-                required
-              />
+              
+              {/* Password */}
+              <div className="space-y-1.5 text-left">
+                <InputField
+                  label="Password"
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  error={formData.password.length > 0 && !isPasswordValid ? 'Password policy not met' : errors.password}
+                  togglePassword={() => setShowPassword(!showPassword)}
+                  showPassword={showPassword}
+                  required
+                />
+              </div>
 
-              <InputField
-                label="Confirm Password"
-                type="password"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="••••••••"
-                error={errors.confirmPassword}
-                required
-              />
+              {/* Confirm Password */}
+              <div className="space-y-1.5 text-left">
+                <InputField
+                  label="Confirm Password"
+                  type="password"
+                  name="confirmPassword"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  placeholder="••••••••"
+                  error={confirmPasswordFilled && !passwordsMatch ? 'Passwords do not match' : errors.confirmPassword}
+                  togglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+                  showPassword={showConfirmPassword}
+                  required
+                />
+              </div>
+
             </div>
+
+            {/* Live Password Checklist & Strength bar */}
+            {formData.password.length > 0 && (
+              <div className="rounded-xl border border-indigo-500/5 bg-[#0a0a0f] p-4 text-left space-y-4">
+                
+                {/* Strength Meter Bar */}
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-[10px]">
+                    <span className="text-gray-500 font-semibold uppercase tracking-wider">Password Strength</span>
+                    <span className={`font-bold uppercase tracking-wider ${strengthTextColor}`}>{strengthText}</span>
+                  </div>
+                  <div className="h-1.5 w-full bg-[#0e0e16] rounded-full overflow-hidden">
+                    <div className={`h-full transition-all duration-500 ${strengthColor}`}></div>
+                  </div>
+                </div>
+
+                {/* Requirements checkmarks */}
+                <div className="space-y-2">
+                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider block">Security Parameters</span>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                    {[
+                      { check: pCheck.length, label: '8+ Characters' },
+                      { check: pCheck.uppercase, label: 'Uppercase Letter' },
+                      { check: pCheck.lowercase, label: 'Lowercase Letter' },
+                      { check: pCheck.number, label: 'Number (0-9)' },
+                      { check: pCheck.special, label: 'Special Symbol (@#$%&*!?)' },
+                    ].map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-1.5">
+                        <CheckCircle2 className={`h-3.5 w-3.5 ${item.check ? 'text-emerald-400' : 'text-gray-600'}`} />
+                        <span className={item.check ? 'text-emerald-400 font-semibold' : 'text-gray-500'}>{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* Live Passwords Match Indicator */}
+            {confirmPasswordFilled && (
+              <div className="flex items-center gap-1.5 text-xs text-left px-1">
+                {passwordsMatch ? (
+                  <>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                    <span className="text-emerald-400 font-semibold">Passwords match</span>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-4 w-4 text-rose-400" />
+                    <span className="text-rose-400 font-semibold">Passwords do not match</span>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Submit Button */}
             <div className="pt-2">
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="group relative w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:bg-indigo-500 transition-all duration-300 disabled:opacity-50 hover:shadow-[0_0_30px_rgba(99,102,241,0.4)]"
+                disabled={isSubmitting || !isFormValid}
+                className="group relative w-full flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:bg-indigo-500 hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:scale-[1.01] transition-all duration-300 disabled:opacity-30 disabled:scale-100 disabled:hover:shadow-none"
               >
                 {isSubmitting ? (
                   <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent"></div>

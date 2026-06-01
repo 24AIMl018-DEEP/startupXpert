@@ -4,10 +4,18 @@ import { useStartup } from '../context/StartupContext';
 import Navbar from '../components/Navbar';
 import ProgressBar from '../components/ProgressBar';
 import InputField from '../components/InputField';
-import { ArrowLeft, ArrowRight, Check, AlertCircle, Compass, HelpCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, AlertCircle, Compass, Save } from 'lucide-react';
 
 const OnboardingDetails = () => {
-  const { startupDetails, updateStartupDetails, updateStartupDetailsBulk } = useStartup();
+  const { 
+    startupDetails, 
+    updateStartupDetails, 
+    updateStartupDetailsBulk, 
+    currentStep, 
+    setCurrentStep, 
+    saveDraft 
+  } = useStartup();
+  
   const navigate = useNavigate();
 
   // Local state for the 17 fields, synchronized with context
@@ -201,6 +209,36 @@ const OnboardingDetails = () => {
 
   const currentField = fields[currentFieldIndex];
 
+  // Micro Patch 4: Restore active index step from context draft payload on mount
+  useEffect(() => {
+    if (currentStep > 0 && currentStep < fields.length) {
+      setCurrentFieldIndex(currentStep);
+    }
+  }, [currentStep]);
+
+  // Synchronize local form state with context startupDetails bulk changes
+  useEffect(() => {
+    setFormData({
+      startupName: startupDetails.startupName || '',
+      startupDomain: startupDetails.startupDomain || '',
+      problemStatement: startupDetails.problemStatement || '',
+      startupDescription: startupDetails.startupDescription || '',
+      targetAudience: startupDetails.targetAudience || '',
+      geographicMarket: startupDetails.geographicMarket || '',
+      existingCompetitors: startupDetails.existingCompetitors || '',
+      revenueModel: startupDetails.revenueModel || '',
+      estimatedPricing: startupDetails.estimatedPricing || '',
+      availableFunding: startupDetails.availableFunding || '',
+      monthlyBurnCapacity: startupDetails.monthlyBurnCapacity || '',
+      platformType: startupDetails.platformType || [],
+      techComplexity: startupDetails.techComplexity || '',
+      mvpTimeline: startupDetails.mvpTimeline || '',
+      scalabilityGoal: startupDetails.scalabilityGoal || '',
+      acquisitionStrategy: startupDetails.acquisitionStrategy || '',
+      startupStage: startupDetails.startupStage || '',
+    });
+  }, [startupDetails]);
+
   // Capture standard keyboard Enter key to advance naturally
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -243,11 +281,14 @@ const OnboardingDetails = () => {
         // Save current field value to context as we go
         updateStartupDetails(currentField.id, formData[currentField.id]);
         
-        setCurrentFieldIndex((prev) => prev + 1);
+        const nextStepIdx = currentFieldIndex + 1;
+        setCurrentStep(nextStepIdx);
+        setCurrentFieldIndex(nextStepIdx);
         setAnimateClass('opacity-100 translate-x-0 transition-all duration-300');
       } else {
         // Final Submit: Save everything and navigate to step 3
         updateStartupDetailsBulk(formData);
+        setCurrentStep(0); // Onboarding details successfully completed
         navigate('/startup/validate');
       }
     }, 300);
@@ -259,7 +300,9 @@ const OnboardingDetails = () => {
 
       setTimeout(() => {
         setError('');
-        setCurrentFieldIndex((prev) => prev - 1);
+        const prevStepIdx = currentFieldIndex - 1;
+        setCurrentStep(prevStepIdx);
+        setCurrentFieldIndex(prevStepIdx);
         setAnimateClass('opacity-100 translate-x-0 transition-all duration-300');
       }, 300);
     }
@@ -274,25 +317,30 @@ const OnboardingDetails = () => {
   const handlePillSingleSelect = (val) => {
     setFormData((prev) => ({ ...prev, [currentField.id]: val }));
     setError('');
+    // Auto-save changes directly
+    updateStartupDetails(currentField.id, val);
   };
 
   const handlePillMultiToggle = (val) => {
     setFormData((prev) => {
       const activePills = [...(prev[currentField.id] || [])];
+      let updatedPills;
       if (activePills.includes(val)) {
-        return { ...prev, [currentField.id]: activePills.filter((p) => p !== val) };
+        updatedPills = activePills.filter((p) => p !== val);
       } else {
-        return { ...prev, [currentField.id]: [...activePills, val] };
+        updatedPills = [...activePills, val];
       }
+      updateStartupDetails(currentField.id, updatedPills);
+      return { ...prev, [currentField.id]: updatedPills };
     });
     setError('');
   };
 
   return (
-    <div className="relative min-h-screen bg-[#0a0a0f] flex flex-col justify-between overflow-x-hidden">
+    <div className="relative min-h-screen bg-[#0a0a0f] flex flex-col justify-between overflow-x-hidden text-white">
       <Navbar />
 
-      <main className="flex-grow py-8 px-4 sm:px-6 lg:px-8 relative z-10 max-w-3xl mx-auto w-full flex flex-col justify-center">
+      <main className="flex-grow py-8 px-4 sm:px-6 lg:px-8 relative z-10 max-w-3xl mx-auto w-full flex flex-col justify-center" role="main">
         {/* Progress Tracker */}
         <ProgressBar currentStep={2} />
 
@@ -327,6 +375,7 @@ const OnboardingDetails = () => {
                   placeholder={currentField.placeholder}
                   error={error}
                   required={currentField.required}
+                  aria-label={currentField.label}
                 />
               )}
 
@@ -340,6 +389,7 @@ const OnboardingDetails = () => {
                   error={error}
                   rows={4}
                   required={currentField.required}
+                  aria-label={currentField.label}
                 />
               )}
 
@@ -353,11 +403,12 @@ const OnboardingDetails = () => {
                   options={currentField.options}
                   error={error}
                   required={currentField.required}
+                  aria-label={currentField.label}
                 />
               )}
 
               {currentField.type === 'pills-single' && (
-                <div className="w-full text-left space-y-2">
+                <div className="w-full text-left space-y-2" role="group" aria-label={currentField.label}>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {currentField.options.map((opt) => {
                       const isSelected = formData[currentField.id] === opt;
@@ -366,11 +417,12 @@ const OnboardingDetails = () => {
                           key={opt}
                           type="button"
                           onClick={() => handlePillSingleSelect(opt)}
-                          className={`py-4 px-4 rounded-xl text-sm font-bold uppercase tracking-wider border transition-all duration-300 ${
+                          className={`py-4 px-4 rounded-xl text-sm font-bold uppercase tracking-wider border transition-all duration-300 focus:ring-2 focus:ring-indigo-500 ${
                             isSelected
                               ? 'bg-indigo-600 border-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)] scale-[1.02]'
                               : 'bg-[#0a0a0f] border-indigo-500/10 text-gray-400 hover:text-white hover:border-indigo-500/30'
                           }`}
+                          aria-pressed={isSelected}
                         >
                           {opt}
                         </button>
@@ -387,7 +439,7 @@ const OnboardingDetails = () => {
               )}
 
               {currentField.type === 'pills-multi' && (
-                <div className="w-full text-left space-y-2">
+                <div className="w-full text-left space-y-2" role="group" aria-label={currentField.label}>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {currentField.options.map((opt) => {
                       const isChecked = (formData[currentField.id] || []).includes(opt);
@@ -396,11 +448,12 @@ const OnboardingDetails = () => {
                           key={opt}
                           type="button"
                           onClick={() => handlePillMultiToggle(opt)}
-                          className={`py-4 px-4 rounded-xl text-sm font-bold uppercase tracking-wider border transition-all duration-300 flex items-center justify-center gap-2 ${
+                          className={`py-4 px-4 rounded-xl text-sm font-bold uppercase tracking-wider border transition-all duration-300 flex items-center justify-center gap-2 focus:ring-2 focus:ring-indigo-500 ${
                             isChecked
                               ? 'bg-cyan-950 border-cyan-400/50 text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.15)] scale-[1.02]'
                               : 'bg-[#0a0a0f] border-indigo-500/10 text-gray-400 hover:text-white hover:border-indigo-500/30'
                           }`}
+                          aria-pressed={isChecked}
                         >
                           {isChecked && <Check className="h-4.5 w-4.5 text-cyan-400" />}
                           {opt}
@@ -420,15 +473,30 @@ const OnboardingDetails = () => {
           </div>
 
           {/* Action Navigation Controls */}
-          <div className="mt-8 border-t border-indigo-500/5 pt-6 flex justify-between items-center gap-4">
-            <button
-              onClick={handleBack}
-              disabled={currentFieldIndex === 0}
-              className="flex items-center gap-2 rounded-xl border border-indigo-500/10 bg-indigo-500/5 px-5 py-3 text-sm font-bold text-gray-400 hover:bg-indigo-500/10 hover:text-white transition-all duration-300 disabled:opacity-30 disabled:hover:bg-indigo-500/5 disabled:hover:text-gray-400"
-            >
-              <ArrowLeft className="h-4.5 w-4.5" />
-              Back
-            </button>
+          <div className="mt-8 border-t border-indigo-500/5 pt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+            
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <button
+                onClick={handleBack}
+                disabled={currentFieldIndex === 0}
+                className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl border border-indigo-500/10 bg-indigo-500/5 px-5 py-3 text-sm font-bold text-gray-400 hover:bg-indigo-500/10 hover:text-white transition-all duration-300 disabled:opacity-30 disabled:hover:bg-indigo-500/5 disabled:hover:text-gray-400 focus:ring-2 focus:ring-indigo-500"
+                aria-label="Back to previous question"
+              >
+                <ArrowLeft className="h-4.5 w-4.5" />
+                Back
+              </button>
+              
+              {/* Save Draft Button (Phase 3 & Micro Patch 4) */}
+              <button
+                type="button"
+                onClick={() => saveDraft(currentFieldIndex, formData)}
+                className="flex items-center justify-center gap-1.5 w-full sm:w-auto rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-4.5 py-3 text-xs font-bold uppercase tracking-wider text-indigo-400 hover:bg-indigo-500/10 hover:text-white transition-all duration-300 focus:ring-2 focus:ring-indigo-500"
+                aria-label="Save current onboarding draft and exit"
+              >
+                <Save className="h-4 w-4" />
+                Save Draft
+              </button>
+            </div>
 
             {currentField.type !== 'textarea' && (
               <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-gray-600 tracking-wider uppercase font-mono select-none">
@@ -438,7 +506,8 @@ const OnboardingDetails = () => {
 
             <button
               onClick={handleNext}
-              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:bg-indigo-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(99,102,241,0.4)]"
+              className="flex items-center justify-center gap-2 w-full sm:w-auto rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:bg-indigo-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(99,102,241,0.4)] focus:ring-2 focus:ring-indigo-500"
+              aria-label={currentFieldIndex === fields.length - 1 ? 'Complete Onboarding details step' : 'Next question'}
             >
               {currentFieldIndex === fields.length - 1 ? (
                 <>

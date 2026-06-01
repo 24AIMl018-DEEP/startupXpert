@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useStartup } from '../context/StartupContext';
 import Navbar from '../components/Navbar';
@@ -6,8 +6,15 @@ import InputField from '../components/InputField';
 import { Lock, Mail, ArrowRight, Sparkles } from 'lucide-react';
 
 const Login = () => {
-  const { loginUser } = useStartup();
+  const { loginUser, isLoggedIn, setLoading } = useStartup();
   const navigate = useNavigate();
+
+  // Redirect authenticated sessions immediately (Auth Redirect)
+  useEffect(() => {
+    if (isLoggedIn) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [isLoggedIn, navigate]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -58,6 +65,7 @@ const Login = () => {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
+    setLoading(true); // show LoadingOverlay
 
     // Simulate small latency
     setTimeout(() => {
@@ -66,9 +74,10 @@ const Login = () => {
       const capitalizedName = mockName.charAt(0).toUpperCase() + mockName.slice(1);
       
       loginUser(formData.email, formData.password, capitalizedName);
+      setLoading(false);
       setIsSubmitting(false);
       navigate('/dashboard');
-    }, 1200);
+    }, 1000);
   };
 
   return (
