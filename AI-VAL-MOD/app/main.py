@@ -1,44 +1,49 @@
+import asyncio
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from app.graph.workflow import app as validator_graph
+from fastapi.middleware.cors import CORSMiddleware
 
-# Initialize the FastAPI server
-app = FastAPI(
-    title="Startup Problem Validator API",
-    description="A LangGraph-powered due diligence pipeline for startup pitches.",
-    version="1.0.0"
+from schema.startup_schema import StartupInputSchema
+from core.config import settings
+from agent.extraction.extraction_agent import extraction_agent
+from agent.analysis.signal_gatekeeper import signal_gatekeeper
+from workflow.research_orchestrator import research_orchestrator
+from services.nlp.unified_vector_store import vector_store
+
+app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# Define the expected format of incoming requests
-class PitchRequest(BaseModel):
-    pitch: str
+@app.get("/health")
+async def health_check():
+    return {"status": "active"}
 
-@app.get("/")
-def health_check():
-    return {"status": "online", "message": "Startup Validator API is running."}
-
-@app.post("/validate")
-async def validate_startup(request: PitchRequest):
-    """
-    Takes a raw startup pitch, runs it through the LangGraph AI pipeline, 
-    and returns a structured JSON validation report.
-    """
-    if not request.pitch.strip():
-        raise HTTPException(status_code=400, detail="Pitch cannot be empty.")
-        
+@app.post("/api/v1/validate-startup")
+async def start_validation_process(startup_data: StartupInputSchema):
     try:
-        print(f"\n[API] Received new pitch: {request.pitch[:50]}...")
-        
-        # 1. Initialize the starting state
-        initial_state = {"pitch": request.pitch}
-        
-        # 2. Trigger the LangGraph state machine
-        # This will synchronously run planner -> researcher -> filter -> synthesizer
-        final_state = validator_graph.invoke(initial_state)
-        
-        # 3. Extract and return ONLY the final JSON report
-        return final_state.get("final_report", {"error": "No report generated."})
-        
+        # Step 1: Extract & normalize
+        normalized_data = extraction_agent.extract_and_normalize(startup_data)
+
+        # Step 2: Research phase — generate queries, search, store in vector DB
+        research_status = await research_orchestrator.run_full_research_cycle(normalized_data)
+
+        # Step 3: Signal Gatekeeper — filter noise across all 7 domains concurrently
+        domains = ["Market", "Competitor", "Customer", "Business", "Regulatory", "Founder", "Technology"]
+        gatekeeper_tasks = [
+            signal_gatekeeper.extract_valid_signals(domain, normalized_data.startup_name, normalized_data.core_problem)
+            for domain in domains
+        ]
+        validated_signals = await asyncio.gather(*gatekeeper_tasks)
+
+        return {
+            "status": "success",
+            "research_stats": research_status,
+            "validated_signals": [s.dict() for s in validated_signals]
+        }
     except Exception as e:
-        print(f"[API Error] Pipeline failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
