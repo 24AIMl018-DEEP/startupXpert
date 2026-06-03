@@ -21,8 +21,8 @@
   "existingCompetitors": "Practo, Tata 1mg, Apollo 24/7",
   "revenueModel": "Commission per consultation and subscription plans",
   "estimatedPricing": "299 INR per consultation",
-  "availableFunding": "5000000 INR",
-  "monthlyBurnCapacity": "200000 INR",
+  "availableFunding": 5000000.0,
+  "monthlyBurnCapacity": 200000.0,
   "platformType": [
     "Mobile App",
     "Web Platform"

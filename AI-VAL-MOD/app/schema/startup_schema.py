@@ -2,6 +2,11 @@ from pydantic import BaseModel, Field, HttpUrl
 from typing import List, Optional, Literal
 
 class StartupInputSchema(BaseModel):
+    
+    """
+    Class For schema..
+    """
+    
     # Founder Profile
     fullName: str = Field(..., description="Full name of the primary founder")
     age: int = Field(..., ge=18, description="Age of the founder")

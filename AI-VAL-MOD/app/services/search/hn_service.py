@@ -7,11 +7,12 @@ class HackerNewsService:
 
     async def search(self, query: str, agent_name: str, max_results: int = 3) -> list[SearchDocument]:
         documents = []
+        safe_query = query[:150]
         try:
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     self.base_url, 
-                    params={"query": query, "hitsPerPage": max_results}
+                    params={"query": safe_query, "hitsPerPage": max_results}
                 )
                 response.raise_for_status()
                 data = response.json()
