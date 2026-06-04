@@ -1,44 +1,77 @@
+import os
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from app.graph.workflow import app as validator_graph
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from fastapi import Request
 
-# Initialize the FastAPI server
-app = FastAPI(
-    title="Startup Problem Validator API",
-    description="A LangGraph-powered due diligence pipeline for startup pitches.",
-    version="1.0.0"
+from schema.startup_input import StartupInput
+from schema.states.pipeline_state import PipelineState
+from services.vector.store import vector_store
+from workflow.graph import run_pipeline
+from typing import Optional
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # warm up sentence-transformer model at startup so first request is fast
+    logger.info("[Startup] Warming up vector store model...")
+    vector_store.add("warmup", {"agent": "warmup"})
+    vector_store.clear()
+    logger.info("[Startup] Model ready")
+    yield
+
+
+app = FastAPI(title="AI Startup Validator", version="2.0.0", lifespan=lifespan)
+
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# Define the expected format of incoming requests
-class PitchRequest(BaseModel):
-    pitch: str
 
-@app.get("/")
-def health_check():
-    return {"status": "online", "message": "Startup Validator API is running."}
+@app.exception_handler(RequestValidationError)
+async def _validation_error(request: Request, exc: RequestValidationError):
+    errors = [{"field": " -> ".join(str(l) for l in e["loc"] if l != "body"), "issue": e["msg"]} for e in exc.errors()]
+    return JSONResponse(status_code=422, content={"status": "invalid_input", "errors": errors})
 
-@app.post("/validate")
-async def validate_startup(request: PitchRequest):
-    """
-    Takes a raw startup pitch, runs it through the LangGraph AI pipeline, 
-    and returns a structured JSON validation report.
-    """
-    if not request.pitch.strip():
-        raise HTTPException(status_code=400, detail="Pitch cannot be empty.")
-        
+
+@app.get("/health")
+def health():
+    return {"status": "active"}
+
+
+@app.post("/api/v1/validate", response_model=PipelineState)
+async def validate(startup_data: StartupInput, session_id: Optional[str] = None):
     try:
-        print(f"\n[API] Received new pitch: {request.pitch[:50]}...")
-        
-        # 1. Initialize the starting state
-        initial_state = {"pitch": request.pitch}
-        
-        # 2. Trigger the LangGraph state machine
-        # This will synchronously run planner -> researcher -> filter -> synthesizer
-        final_state = validator_graph.invoke(initial_state)
-        
-        # 3. Extract and return ONLY the final JSON report
-        return final_state.get("final_report", {"error": "No report generated."})
-        
+        return await run_pipeline(startup_data, session_id=session_id)
     except Exception as e:
-        print(f"[API Error] Pipeline failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/vector/search")
+def vector_search(query: str, top_k: int = 5, agent: str = None):
+    return {"query": query, "results": vector_store.search(query=query, top_k=top_k, agent_filter=agent)}
+
+
+@app.get("/api/v1/vector/stats")
+def vector_stats():
+    return vector_store.stats()
+
+
+@app.delete("/api/v1/vector/clear")
+def vector_clear():
+    vector_store.clear()
+    return {"status": "cleared"}
