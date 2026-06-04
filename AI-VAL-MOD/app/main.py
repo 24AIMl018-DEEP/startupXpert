@@ -1,57 +1,77 @@
-from fastapi import FastAPI, HTTPException, Request
+import os
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
-from schema.startup_schema import StartupInputSchema
-from core.config import settings
+from fastapi import Request
 
-from agent.extraction.extraction_agent import extraction_agent
-from workflow.research_orchestrator import research_orchestrator
-from workflow.analysis_orchestrator import analysis_orchestrator
+from schema.startup_input import StartupInput
+from schema.states.pipeline_state import PipelineState
+from services.vector.store import vector_store
+from workflow.graph import run_pipeline
+from typing import Optional
 
-app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+)
+logger = logging.getLogger(__name__)
 
-@app.exception_handler(RequestValidationError)
-async def validation_error_handler(request: Request, exc: RequestValidationError):
-    errors = []
-    for err in exc.errors():
-        field = " -> ".join(str(l) for l in err["loc"] if l != "body")
-        errors.append({"field": field, "issue": err["msg"], "your_value": err.get("input")})
-    return JSONResponse(status_code=422, content={"status": "invalid_input", "errors": errors})
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # warm up sentence-transformer model at startup so first request is fast
+    logger.info("[Startup] Warming up vector store model...")
+    vector_store.add("warmup", {"agent": "warmup"})
+    vector_store.clear()
+    logger.info("[Startup] Model ready")
+    yield
+
+
+app = FastAPI(title="AI Startup Validator", version="2.0.0", lifespan=lifespan)
+
+ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.post("/api/v1/validate-startup")
-async def start_validation_process(startup_data: StartupInputSchema):
+
+@app.exception_handler(RequestValidationError)
+async def _validation_error(request: Request, exc: RequestValidationError):
+    errors = [{"field": " -> ".join(str(l) for l in e["loc"] if l != "body"), "issue": e["msg"]} for e in exc.errors()]
+    return JSONResponse(status_code=422, content={"status": "invalid_input", "errors": errors})
+
+
+@app.get("/health")
+def health():
+    return {"status": "active"}
+
+
+@app.post("/api/v1/validate", response_model=PipelineState)
+async def validate(startup_data: StartupInput, session_id: Optional[str] = None):
     try:
-        print(f"--- STARTING VALIDATION FOR: {startup_data.startupName} ---")
-
-        print(">> PHASE 1: EXTRACTION")
-        normalized_data = extraction_agent.extract_and_normalize(startup_data)
-
-        print(">> PHASE 2: RESEARCH & STORAGE")
-        research_status = await research_orchestrator.run_full_research_cycle(normalized_data)
-
-        print(">> PHASE 3: ANALYSIS & FINAL VERDICT")
-        final_analysis = await analysis_orchestrator.run_full_analysis(normalized_data)
-
-        # Pull top relevant docs per domain using startup-specific cosine queries
-        from services.nlp.unified_vector_store import vector_store
-        research_data = vector_store.retrieve_top_by_domain(startup=normalized_data, top_k=5)
-
-        return {
-            "status": "success",
-            "startup": normalized_data.startup_name,
-            "research_stats": research_status,
-            "research_data": research_data,
-            "full_report": final_analysis
-        }
+        return await run_pipeline(startup_data, session_id=session_id)
     except Exception as e:
-        print(f"PIPELINE CRASHED: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/vector/search")
+def vector_search(query: str, top_k: int = 5, agent: str = None):
+    return {"query": query, "results": vector_store.search(query=query, top_k=top_k, agent_filter=agent)}
+
+
+@app.get("/api/v1/vector/stats")
+def vector_stats():
+    return vector_store.stats()
+
+
+@app.delete("/api/v1/vector/clear")
+def vector_clear():
+    vector_store.clear()
+    return {"status": "cleared"}
