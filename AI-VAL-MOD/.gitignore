@@ -1,4 +1,31 @@
+# env
 .env
+.env.local
+
+# python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
 venv/
+.venv/
+
+# ML model cache (downloaded at runtime)
+.cache/
+models/
+*.bin
+*.pt
+
+# vector store
+chroma_store/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

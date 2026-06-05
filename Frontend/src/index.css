@@ -1,0 +1,95 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", "DM Sans", sans-serif;
+  --font-heading: "Inter", sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: 'Inter', 'DM Sans', sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    overflow-x: hidden;
+    background-color: #0a0a0f;
+    color: #f1f5f9;
+  }
+}
+
+/* ── Dark Theme Bodies ── */
+body.theme-dark-futurism {
+  background-color: #0a0a0f;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(99, 102, 241, 0.05) 0%, transparent 45%),
+    radial-gradient(circle at 85% 75%, rgba(34, 211, 238, 0.05) 0%, transparent 45%),
+    linear-gradient(to right, rgba(99, 102, 241, 0.015) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(99, 102, 241, 0.015) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+  background-attachment: fixed;
+}
+
+body.theme-midnight-blue {
+  background-color: #050b1a;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(59, 130, 246, 0.05) 0%, transparent 45%),
+    radial-gradient(circle at 85% 75%, rgba(96, 165, 250, 0.05) 0%, transparent 45%),
+    linear-gradient(to right, rgba(59, 130, 246, 0.015) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(59, 130, 246, 0.015) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+  background-attachment: fixed;
+}
+
+body.theme-neo-emerald {
+  background-color: #030c08;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(16, 185, 129, 0.05) 0%, transparent 45%),
+    radial-gradient(circle at 85% 75%, rgba(52, 211, 153, 0.05) 0%, transparent 45%),
+    linear-gradient(to right, rgba(16, 185, 129, 0.012) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(16, 185, 129, 0.012) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+  background-attachment: fixed;
+}
+
+/* ── Scrollbars ── */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2d2d3f; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+
+/* ── Selection ── */
+::selection { background-color: rgba(99, 102, 241, 0.25); color: #ffffff; }
+
+/* ── Animations ── */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-float { animation: float 6s ease-in-out infinite; }
+
+/* ── Custom Tiny Text Sizes (used in badges, labels) ── */
+.text-2xs  { font-size: 0.625rem;  line-height: 1rem; }   /* 10px */
+.text-3xs  { font-size: 0.5625rem; line-height: 0.875rem; } /* 9px  */
+
+/* ── ReactFlow Canvas Fix ── */
+.react-flow__renderer { width: 100% !important; height: 100% !important; }
+.react-flow { width: 100% !important; height: 100% !important; }
+
+/* ── px-4.5 utility ── */
+.px-4\.5 { padding-left: 1.125rem; padding-right: 1.125rem; }
+.py-3\.5 { padding-top: 0.875rem; padding-bottom: 0.875rem; }
+
+/* ── h-4.5 / w-4.5 icon size ── */
+.h-4\.5 { height: 1.125rem; }
+.w-4\.5 { width: 1.125rem; }
