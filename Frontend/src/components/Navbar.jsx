@@ -1,122 +1,143 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useStartup } from '../context/StartupContext';
-import { Sparkles, Menu, X, LogOut, ArrowRight, LayoutDashboard } from 'lucide-react';
+import { Sparkles, Menu, X, ArrowRight, LayoutDashboard, User, LogOut, ChevronDown } from 'lucide-react';
 
 const Navbar = () => {
-  const { isLoggedIn, logoutUser, user } = useStartup();
+  const { isLoggedIn, logoutUser, user, getInitials } = useStartup();
   const navigate = useNavigate();
   const location = useLocation();
   const [isOpen, setIsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const handleLogout = () => {
+    setProfileOpen(false);
     logoutUser();
     navigate('/');
+  };
+
+  const scrollToSection = (id) => {
+    setIsOpen(false);
+    if (location.pathname !== '/') {
+      navigate('/');
+      setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }), 150);
+    } else {
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   const isActive = (path) => location.pathname === path;
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b border-indigo-500/10 bg-[#0a0a0f]/80 backdrop-blur-md">
+    <nav className="sticky top-0 z-50 w-full border-b border-indigo-500/10 bg-[#0a0a0f]/90 backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <div className="flex h-20 items-center justify-between">
+        <div className="flex h-16 items-center justify-between">
+
           {/* Logo */}
-          <div className="flex items-center">
-            <Link to="/" className="flex items-center gap-2 group">
-              <div className="relative flex h-10 w-10 items-center justify-center rounded-lg border border-indigo-500/30 bg-indigo-500/10 transition-all duration-300 group-hover:border-cyan-400/50 group-hover:shadow-[0_0_15px_rgba(99,102,241,0.4)]">
-                <Sparkles className="h-5 w-5 text-indigo-400 transition-colors group-hover:text-cyan-300" />
-                <div className="absolute -inset-0.5 rounded-lg bg-indigo-500/20 blur opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-              </div>
-              <span className="font-heading text-xl font-bold tracking-tight text-white transition-all duration-300 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-indigo-400 group-hover:to-cyan-300">
-                Startup<span className="text-indigo-500">Xpert</span>
-              </span>
-            </Link>
-          </div>
+          <Link to="/" className="flex items-center gap-2 group">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-500/30 bg-indigo-500/10 transition-all duration-200 group-hover:border-indigo-500/50">
+              <Sparkles className="h-4 w-4 text-indigo-400" />
+            </div>
+            <span className="text-[15px] font-bold tracking-tight text-white">
+              Startup<span className="text-indigo-500">Xpert</span>
+            </span>
+          </Link>
 
           {/* Desktop Nav Links */}
-          <div className="hidden md:block">
-            <div className="flex items-center gap-8">
-              <Link 
-                to="/" 
-                className={`text-sm font-medium tracking-wide transition-colors duration-300 ${isActive('/') ? 'text-indigo-400' : 'text-gray-400 hover:text-white'}`}
-              >
-                Validate
-              </Link>
-              <a 
-                href="#features" 
-                onClick={(e) => {
-                  if (location.pathname !== '/') {
-                    e.preventDefault();
-                    navigate('/');
-                    setTimeout(() => {
-                      document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
-                    }, 100);
-                  }
-                }}
-                className="text-sm font-medium tracking-wide text-gray-400 hover:text-white transition-colors duration-300"
-              >
-                Features
-              </a>
-              <a 
-                href="#methodology"
-                onClick={(e) => {
-                  e.preventDefault();
-                  alert('Our AI methodology analyses 250+ industry criteria to deliver realistic market insight cards.');
-                }}
-                className="text-sm font-medium tracking-wide text-gray-400 hover:text-white transition-colors duration-300"
-              >
-                Methodology
-              </a>
-            </div>
+          <div className="hidden md:flex items-center gap-6">
+            <button
+              onClick={() => scrollToSection('features')}
+              className={`text-sm font-medium transition-colors duration-200 ${isActive('/') ? 'text-white' : 'text-gray-400 hover:text-white'}`}
+            >
+              Features
+            </button>
+            <button
+              onClick={() => scrollToSection('methodology')}
+              className="text-sm font-medium text-gray-400 hover:text-white transition-colors duration-200"
+            >
+              Methodology
+            </button>
           </div>
 
           {/* Desktop Actions */}
-          <div className="hidden md:block">
-            <div className="flex items-center gap-4">
-              {isLoggedIn ? (
-                <>
-                  <Link
-                    to="/dashboard"
-                    className="flex items-center gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/10 px-4 py-2 text-sm font-medium text-indigo-300 hover:bg-indigo-500/20 hover:text-white transition-all duration-300 hover:shadow-[0_0_15px_rgba(99,102,241,0.25)]"
-                  >
-                    <LayoutDashboard className="h-4 w-4" />
-                    Dashboard
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 rounded-lg border border-red-500/10 bg-red-500/5 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-all duration-300"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    Log Out
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link
-                    to="/login"
-                    className="text-sm font-medium text-gray-300 hover:text-white transition-colors duration-300"
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    to="/register"
-                    className="group relative flex items-center gap-1.5 overflow-hidden rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-all duration-300 hover:bg-indigo-500 hover:shadow-[0_0_20px_rgba(99,102,241,0.5)] focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                  >
-                    Get Started
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </Link>
-                </>
-              )}
-            </div>
+          <div className="hidden md:flex items-center gap-3">
+            {isLoggedIn ? (
+              <div className="relative">
+                <button
+                  onClick={() => setProfileOpen(!profileOpen)}
+                  className="flex items-center gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/8 px-3 py-1.5 text-sm text-gray-300 hover:text-white hover:bg-indigo-500/15 transition-all duration-200"
+                >
+                  {user.avatarUrl ? (
+                    <img src={user.avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover border border-indigo-500/30" />
+                  ) : (
+                    <div className="h-6 w-6 rounded-full bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 flex items-center justify-center text-[10px] font-bold">
+                      {getInitials()}
+                    </div>
+                  )}
+                  <span className="text-[13px] font-medium">{user.fullName?.split(' ')[0] || 'Account'}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 text-gray-500 transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {profileOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-52 rounded-xl border border-indigo-500/15 bg-[#0e0e16] shadow-xl shadow-black/40 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
+                    <div className="px-4 py-3 border-b border-indigo-500/10">
+                      <p className="text-[13px] font-semibold text-white">{user.fullName}</p>
+                      <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
+                    </div>
+                    <div className="py-1.5">
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate('/dashboard'); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        <LayoutDashboard className="h-4 w-4 text-gray-500" />
+                        Dashboard
+                      </button>
+                      <button
+                        onClick={() => { setProfileOpen(false); navigate('/profile'); }}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-gray-300 hover:text-white hover:bg-white/5 transition-colors"
+                      >
+                        <User className="h-4 w-4 text-gray-500" />
+                        Profile
+                      </button>
+                    </div>
+                    <div className="border-t border-indigo-500/10 py-1.5">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-red-400 hover:text-red-300 hover:bg-red-500/8 transition-colors"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Log Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  className="text-sm font-medium text-gray-400 hover:text-white transition-colors duration-200"
+                >
+                  Sign In
+                </Link>
+                <Link
+                  to="/register"
+                  className="group flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 transition-all duration-200 hover:shadow-[0_0_20px_rgba(99,102,241,0.35)]"
+                >
+                  Get Started
+                  <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
-          <div className="md:hidden">
+          <div className="md:hidden flex items-center gap-2">
             <button
               onClick={() => setIsOpen(!isOpen)}
-              className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-800 text-gray-400 hover:bg-gray-900 hover:text-white transition-all duration-300"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-800 text-gray-400 hover:text-white transition-all"
             >
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </button>
           </div>
         </div>
@@ -124,79 +145,32 @@ const Navbar = () => {
 
       {/* Mobile Drawer */}
       {isOpen && (
-        <div className="border-t border-gray-900 bg-[#0a0a0f] px-4 py-6 md:hidden space-y-4">
-          <div className="flex flex-col gap-4">
-            <Link
-              to="/"
-              onClick={() => setIsOpen(false)}
-              className="text-base font-medium text-gray-300 hover:text-white"
-            >
-              Validate
-            </Link>
-            <Link
-              to="/"
-              onClick={() => {
-                setIsOpen(false);
-                setTimeout(() => {
-                  document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' });
-                }, 100);
-              }}
-              className="text-base font-medium text-gray-300 hover:text-white"
-            >
-              Features
-            </Link>
-            <button
-              onClick={() => {
-                setIsOpen(false);
-                alert('Our AI methodology analyses 250+ industry criteria to deliver realistic market insight cards.');
-              }}
-              className="text-left text-base font-medium text-gray-300 hover:text-white"
-            >
-              Methodology
-            </button>
-          </div>
-          <div className="border-t border-gray-900 pt-4 flex flex-col gap-3">
+        <div className="border-t border-indigo-500/10 bg-[#0a0a0f] px-4 py-5 md:hidden space-y-3">
+          <button onClick={() => scrollToSection('features')} className="block w-full text-left text-sm font-medium text-gray-300 hover:text-white py-2">Features</button>
+          <button onClick={() => scrollToSection('methodology')} className="block w-full text-left text-sm font-medium text-gray-300 hover:text-white py-2">Methodology</button>
+          <div className="border-t border-indigo-500/10 pt-3 space-y-2">
             {isLoggedIn ? (
               <>
-                <Link
-                  to="/dashboard"
-                  onClick={() => setIsOpen(false)}
-                  className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-indigo-500"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Dashboard
+                <Link to="/dashboard" onClick={() => setIsOpen(false)} className="flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white">
+                  <LayoutDashboard className="h-4 w-4" /> Dashboard
                 </Link>
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    handleLogout();
-                  }}
-                  className="flex items-center justify-center gap-2 rounded-lg border border-red-500/20 bg-red-500/5 px-4 py-2.5 text-center text-sm font-medium text-red-400 hover:bg-red-500/10"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Log Out
+                <button onClick={() => { setIsOpen(false); handleLogout(); }} className="w-full flex items-center justify-center gap-2 rounded-lg border border-red-500/20 px-4 py-2.5 text-sm font-medium text-red-400">
+                  <LogOut className="h-4 w-4" /> Log Out
                 </button>
               </>
             ) : (
               <>
-                <Link
-                  to="/login"
-                  onClick={() => setIsOpen(false)}
-                  className="rounded-lg border border-gray-800 py-2.5 text-center text-sm font-medium text-gray-300 hover:bg-gray-900 hover:text-white"
-                >
-                  Sign In
-                </Link>
-                <Link
-                  to="/register"
-                  onClick={() => setIsOpen(false)}
-                  className="rounded-lg bg-indigo-600 py-2.5 text-center text-sm font-medium text-white hover:bg-indigo-500"
-                >
-                  Get Started
-                </Link>
+                <Link to="/login" onClick={() => setIsOpen(false)} className="block rounded-lg border border-indigo-500/15 py-2.5 text-center text-sm font-medium text-gray-300">Sign In</Link>
+                <Link to="/register" onClick={() => setIsOpen(false)} className="block rounded-lg bg-indigo-600 py-2.5 text-center text-sm font-medium text-white">Get Started</Link>
               </>
             )}
           </div>
         </div>
+      )}
+
+      {/* Close profile dropdown on outside click */}
+      {profileOpen && (
+        <div className="fixed inset-0 z-40" onClick={() => setProfileOpen(false)} />
       )}
     </nav>
   );

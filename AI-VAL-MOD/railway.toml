@@ -1,0 +1,10 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+# Set MODULE=validation or MODULE=roadmap in Railway environment variables
+startCommand = "sh -c 'if [ \"$MODULE\" = \"roadmap\" ]; then cd Roadmap-Module/app && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1; else cd Validation-Module/app && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1; fi'"
+healthcheckPath = "/health"
+healthcheckTimeout = 120
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3

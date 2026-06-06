@@ -1,27 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "DM Sans", sans-serif;
-  --font-heading: "Syne", sans-serif;
-}
-
-/* Base resets & theme styles */
-body, aside, main, div, button, nav, header, select, input, textarea, a {
-  transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), border-color 300ms cubic-bezier(0.4, 0, 0.2, 1), color 300ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  --font-sans: "Inter", "DM Sans", sans-serif;
+  --font-heading: "Inter", sans-serif;
 }
 
 @layer base {
   body {
-    color: #f3f4f6;
-    font-family: 'DM Sans', sans-serif;
+    font-family: 'Inter', 'DM Sans', sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
     overflow-x: hidden;
+    background-color: #0a0a0f;
+    color: #f1f5f9;
   }
 }
 
-/* Theme 1 - Dark Futurism (Default) */
+/* ── Dark Theme Bodies ── */
 body.theme-dark-futurism {
   background-color: #0a0a0f;
-  background-image: 
+  background-image:
     radial-gradient(circle at 15% 25%, rgba(99, 102, 241, 0.05) 0%, transparent 45%),
     radial-gradient(circle at 85% 75%, rgba(34, 211, 238, 0.05) 0%, transparent 45%),
     linear-gradient(to right, rgba(99, 102, 241, 0.015) 1px, transparent 1px),
@@ -30,20 +27,9 @@ body.theme-dark-futurism {
   background-attachment: fixed;
 }
 
-/* Theme 2 - Midnight Blue */
 body.theme-midnight-blue {
   background-color: #050b1a;
-  --color-indigo-950: #0e1f38;
-  --color-indigo-600: #1d4ed8;
-  --color-indigo-500: #3b82f6;
-  --color-indigo-400: #60a5fa;
-  --color-indigo-300: #93c5fd;
-  --color-cyan-950: #0b2545;
-  --color-cyan-500: #0284c7;
-  --color-cyan-400: #38bdf8;
-  --color-cyan-300: #7dd3fc;
-  
-  background-image: 
+  background-image:
     radial-gradient(circle at 15% 25%, rgba(59, 130, 246, 0.05) 0%, transparent 45%),
     radial-gradient(circle at 85% 75%, rgba(96, 165, 250, 0.05) 0%, transparent 45%),
     linear-gradient(to right, rgba(59, 130, 246, 0.015) 1px, transparent 1px),
@@ -52,20 +38,9 @@ body.theme-midnight-blue {
   background-attachment: fixed;
 }
 
-/* Theme 3 - Neo Emerald */
 body.theme-neo-emerald {
   background-color: #030c08;
-  --color-indigo-950: #062e1d;
-  --color-indigo-600: #059669;
-  --color-indigo-500: #10b981;
-  --color-indigo-400: #34d399;
-  --color-indigo-300: #6ee7b7;
-  --color-cyan-950: #022c22;
-  --color-cyan-500: #0d9488;
-  --color-cyan-400: #2dd4bf;
-  --color-cyan-300: #5eead4;
-  
-  background-image: 
+  background-image:
     radial-gradient(circle at 15% 25%, rgba(16, 185, 129, 0.05) 0%, transparent 45%),
     radial-gradient(circle at 85% 75%, rgba(52, 211, 153, 0.05) 0%, transparent 45%),
     linear-gradient(to right, rgba(16, 185, 129, 0.012) 1px, transparent 1px),
@@ -74,48 +49,47 @@ body.theme-neo-emerald {
   background-attachment: fixed;
 }
 
-/* Custom Scrollbars */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: #0a0a0f;
-}
-::-webkit-scrollbar-thumb {
-  background: #1e1e2f;
-  border-radius: 9999px;
-  border: 1px solid rgba(99, 102, 241, 0.1);
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #6366f1;
-}
+/* ── Scrollbars ── */
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2d2d3f; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #6366f1; }
 
-/* Selection */
-::selection {
-  background-color: rgba(99, 102, 241, 0.3);
-  color: #ffffff;
-}
+/* ── Selection ── */
+::selection { background-color: rgba(99, 102, 241, 0.25); color: #ffffff; }
 
-/* Smooth transitions */
-.transition-all-300 {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Custom animations */
+/* ── Animations ── */
 @keyframes float {
   0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-10px); }
+  50%       { transform: translateY(-8px); }
+}
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes slideIn {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-.animate-float {
-  animation: float 6s ease-in-out infinite;
-}
+.animate-float { animation: float 6s ease-in-out infinite; }
 
-/* Custom styles for grid pattern overlay */
-.grid-glow {
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.1), transparent 50%);
-  pointer-events: none;
-}
+/* ── Custom Tiny Text Sizes (used in badges, labels) ── */
+.text-2xs  { font-size: 0.625rem;  line-height: 1rem; }   /* 10px */
+.text-3xs  { font-size: 0.5625rem; line-height: 0.875rem; } /* 9px  */
+
+/* ── ReactFlow Canvas Fix ── */
+.react-flow__renderer { width: 100% !important; height: 100% !important; }
+.react-flow { width: 100% !important; height: 100% !important; }
+
+/* ── px-4.5 utility ── */
+.px-4\.5 { padding-left: 1.125rem; padding-right: 1.125rem; }
+.py-3\.5 { padding-top: 0.875rem; padding-bottom: 0.875rem; }
+
+/* ── h-4.5 / w-4.5 icon size ── */
+.h-4\.5 { height: 1.125rem; }
+.w-4\.5 { width: 1.125rem; }

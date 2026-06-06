@@ -4,6 +4,7 @@ import { useStartup } from '../context/StartupContext';
 import Navbar from '../components/Navbar';
 import InputField from '../components/InputField';
 import { Sparkles, ArrowRight, UserCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { signUpUser } from "../services/authService";
 
 const Register = () => {
   const { registerUser, isLoggedIn, setLoading } = useStartup();
@@ -26,6 +27,7 @@ const Register = () => {
   });
 
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,20 +112,36 @@ const Register = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
     setIsSubmitting(true);
     setLoading(true);
+    setSubmitError('');
 
-    // Simulate standard latency
-    setTimeout(() => {
-      registerUser(formData.fullName, formData.email, formData.role);
+    try {
+      const data = await signUpUser(formData.fullName, formData.email, formData.password, formData.role);
+
+      // Supabase may require email confirmation before user is active
+      const needsConfirmation = data.user && !data.session;
+      if (needsConfirmation) {
+        setSubmitError(
+          '✅ Account created! Please check your email inbox and click the confirmation link to activate your account, then log in.'
+        );
+        setIsSubmitting(false);
+        setLoading(false);
+        return;
+      }
+
+      registerUser(formData.fullName, formData.email, formData.role, data.user?.id || null);
+      navigate('/onboarding/role'); // New users must complete onboarding
+    } catch (err) {
+      setSubmitError(err.message || 'Registration failed. Please try again.');
+    } finally {
       setLoading(false);
       setIsSubmitting(false);
-      navigate('/onboarding/role');
-    }, 1200);
+    }
   };
 
   return (
@@ -291,6 +309,17 @@ const Register = () => {
                     <span className="text-rose-400 font-semibold">Passwords do not match</span>
                   </>
                 )}
+              </div>
+            )}
+
+            {/* Submit Error / Success Message */}
+            {submitError && (
+              <div className={`rounded-xl border px-4 py-3 text-sm ${
+                submitError.startsWith('✅')
+                  ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-400'
+                  : 'border-rose-500/20 bg-rose-500/5 text-rose-400'
+              }`}>
+                {submitError}
               </div>
             )}
 

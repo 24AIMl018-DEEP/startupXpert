@@ -20,7 +20,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   FileCode,
-  Gauge
+  Gauge,
+  Construction,
+  WrenchIcon
 } from 'lucide-react';
 
 const Dashboard = () => {
@@ -52,6 +54,13 @@ const Dashboard = () => {
     }
   }, [location.state]);
 
+  useEffect(() => {
+    if (activeTab === 'roadmap') {
+      setActiveTab('overview');
+      navigate('/roadmap');
+    }
+  }, [activeTab, navigate]);
+
   // Verify if a verified startup exists in current session context
   const hasValidatedStartup = !!startupDetails.startupName;
 
@@ -63,22 +72,15 @@ const Dashboard = () => {
     }
   };
 
-  // View Previous Analysis Item (Micro Patch 3)
+  // View Previous Analysis Item
   const handleViewAnalysis = (item) => {
-    setLoadingStateSimulated(() => {
-      // Restore score matrix and names in context
-      setAnalysisScores(item.scores);
-      setStartupInfo({
-        startupName: item.startupName,
-        startupDomain: item.scores.marketDemand ? 'SaaS' : 'Other', // fallback Domain sync
-        revenueModel: item.scores.revenuePotential ? 'Subscription' : 'Other',
-        availableFunding: 'Bootstrapped',
-        mvpTimeline: '3 months',
-        platformType: ['Web App']
-      });
-      showToast(`Loading analysis report for "${item.startupName}"`, 'success');
-      navigate('/analysis/result');
-    });
+    setAnalysisScores(item.scores);
+    // Restore actual startup details saved at analysis time
+    if (item.startupDetails) {
+      setStartupInfo(item.startupDetails);
+    }
+    showToast(`Loading analysis for "${item.startupName}"`, 'success');
+    navigate('/analysis/result');
   };
 
   // Delete History Item (Micro Patch 3)
@@ -87,13 +89,7 @@ const Dashboard = () => {
     deleteHistoryItem(id);
   };
 
-  // Simulated internal page loading trigger
-  const setLoadingStateSimulated = (callback) => {
-    showToast('Synthesizing venture report data layers...', 'info');
-    setTimeout(callback, 800);
-  };
-
-  return (
+return (
     <div className="relative min-h-screen bg-[#0a0a0f] flex text-white overflow-hidden">
       
       {/* Sidebar Navigation */}
@@ -106,48 +102,32 @@ const Dashboard = () => {
           {/* Dashboard Header Bar or New User Onboarding Banner */}
           {user.isNewUser ? (
             <div className="relative rounded-2xl border border-indigo-500/15 bg-indigo-950/15 p-8 text-left backdrop-blur-md overflow-hidden space-y-6 shadow-[0_0_35px_rgba(99,102,241,0.08)]">
-              {/* background decorative light */}
               <div className="absolute -right-24 -top-24 h-48 w-48 rounded-full bg-indigo-500/10 blur-2xl"></div>
               
               <div className="space-y-2 max-w-2xl">
-                <span className="rounded bg-indigo-950 border border-indigo-500/20 px-3 py-0.5 text-3xs font-extrabold tracking-widest text-indigo-300 uppercase">
-                  Workspace Initialized
-                </span>
-                <h2 className="font-heading text-3xl font-extrabold text-white mt-3">
-                  Welcome to StartupXpert
+                <h2 className="font-heading text-2xl font-bold text-white">
+                  Welcome to StartupXpert, {user.fullName?.split(' ')[0] || 'Founder'} 👋
                 </h2>
                 <p className="text-sm text-gray-400 leading-relaxed">
-                  Let's validate your first startup idea. Our AI engine will stress-test your concept models against 250+ target market segments, problem-solution vectors, and cash-flow parameters.
+                  Your account is ready. When you're set, validate your startup idea — our AI will stress-test it across 250+ market parameters.
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row items-start gap-3 pt-1">
                 <button
                   onClick={() => {
                     setNewUserStatus(false);
                     navigate('/onboarding/role');
                   }}
-                  className="group flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-lg shadow-indigo-600/10 hover:bg-indigo-500 transition-all duration-300 hover:scale-[1.02] w-full sm:w-auto"
-                >
+                  className="group flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-500 transition-all duration-200 hover:shadow-[0_0_20px_rgba(99,102,241,0.3)]">
                   <Plus className="h-4 w-4" />
-                  Validate Startup
+                  Validate My First Idea
                 </button>
-                
-                <button
-                  onClick={() => {
-                    setNewUserStatus(false);
-                    navigate('/profile');
-                  }}
-                  className="flex items-center justify-center gap-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-gray-300 hover:bg-indigo-500/10 hover:text-white transition-all duration-300 w-full sm:w-auto"
-                >
-                  Complete Profile
-                </button>
-
                 <button
                   onClick={() => setNewUserStatus(false)}
-                  className="text-xs font-bold uppercase tracking-widest text-gray-500 hover:text-white transition-all duration-300 mt-2 sm:mt-0 sm:ml-auto"
+                  className="text-sm font-medium text-gray-500 hover:text-white transition-colors py-3"
                 >
-                  Skip for Now
+                  Explore dashboard first →
                 </button>
               </div>
             </div>
@@ -381,7 +361,7 @@ const Dashboard = () => {
 
                     {/* Action 2: Generate Roadmap */}
                     <button
-                      onClick={() => showToast('Roadmap generation modules are coming soon in Version 2.0!', 'info')}
+                      onClick={() => navigate('/roadmap')}
                       className="w-full flex items-center justify-between p-4 rounded-xl border border-indigo-500/10 bg-indigo-500/5 hover:border-indigo-500/30 hover:bg-indigo-500/10 text-left transition-all duration-300 group"
                     >
                       <div className="space-y-1">
@@ -436,7 +416,7 @@ const Dashboard = () => {
                       <div className="flex items-center justify-between border-b border-indigo-500/5 pb-4">
                         <div>
                           <h4 className="text-lg font-bold font-heading text-white">{item.startupName}</h4>
-                          <p className="text-xs text-indigo-400 mt-0.5">{item.scores.marketDemand ? 'SaaS domain model' : 'Venture Proposal'}</p>
+                          <p className="text-xs text-indigo-400 mt-0.5">{item.startupDetails?.startupDomain || 'Venture Proposal'}</p>
                         </div>
                         <div className="flex items-center gap-3">
                           <span className="rounded-full bg-emerald-950/60 border border-emerald-500/30 px-3 py-1 text-2xs font-bold uppercase tracking-widest text-emerald-400">
@@ -607,7 +587,7 @@ const Dashboard = () => {
                             {item.startupName}
                           </h4>
                           <span className="rounded bg-indigo-950/60 border border-indigo-500/20 px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase text-indigo-400">
-                            {item.scores.marketDemand ? 'SaaS' : 'Startup Idea'}
+                            {item.startupDetails?.startupDomain || 'Startup Idea'}
                           </span>
                           <span className="text-xs text-gray-500 font-mono">{item.date}</span>
                         </div>

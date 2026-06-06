@@ -12,6 +12,7 @@ import StartupInput from './pages/StartupInput';
 import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
+import Roadmap from './pages/Roadmap';
 import NotFound from './pages/NotFound';
 
 // New Upgrades Routing Flow
@@ -32,7 +33,7 @@ function App() {
         <Route 
           path="/onboarding/role" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute skipOnboardingCheck={true}>
               <OnboardingRole />
             </ProtectedRoute>
           } 
@@ -40,7 +41,7 @@ function App() {
         <Route 
           path="/onboarding/details" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute skipOnboardingCheck={true}>
               <OnboardingDetails />
             </ProtectedRoute>
           } 
@@ -48,7 +49,7 @@ function App() {
         <Route 
           path="/startup/validate" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute skipOnboardingCheck={true}>
               <StartupInput />
             </ProtectedRoute>
           } 
@@ -58,11 +59,12 @@ function App() {
         <Route 
           path="/analysis/loader" 
           element={
-            <ProtectedRoute>
+            <ProtectedRoute skipOnboardingCheck={true}>
               <AnalysisLoader />
             </ProtectedRoute>
           } 
         />
+
 
         {/* Detailed Metric Analysis Scores Dashboard */}
         <Route 
@@ -80,6 +82,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/roadmap" 
+          element={
+            <ProtectedRoute>
+              <Roadmap />
             </ProtectedRoute>
           } 
         />

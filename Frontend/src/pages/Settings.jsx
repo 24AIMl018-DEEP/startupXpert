@@ -10,7 +10,7 @@ import {
   RefreshCw, 
   Save, 
   ShieldAlert, 
-  Moon, 
+  Moon,
   Sparkles 
 } from 'lucide-react';
 
@@ -21,7 +21,7 @@ const Settings = () => {
     resetSettingsDefaults, 
     clearDraft, 
     clearHistory, 
-    loadingState 
+    loadingState
   } = useStartup();
   
   const { showToast } = useToast();

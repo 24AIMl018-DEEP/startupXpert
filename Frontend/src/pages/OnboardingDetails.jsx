@@ -209,35 +209,18 @@ const OnboardingDetails = () => {
 
   const currentField = fields[currentFieldIndex];
 
-  // Micro Patch 4: Restore active index step from context draft payload on mount
+  // Restore active index step from draft on mount only
   useEffect(() => {
     if (currentStep > 0 && currentStep < fields.length) {
       setCurrentFieldIndex(currentStep);
     }
-  }, [currentStep]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Synchronize local form state with context startupDetails bulk changes
-  useEffect(() => {
-    setFormData({
-      startupName: startupDetails.startupName || '',
-      startupDomain: startupDetails.startupDomain || '',
-      problemStatement: startupDetails.problemStatement || '',
-      startupDescription: startupDetails.startupDescription || '',
-      targetAudience: startupDetails.targetAudience || '',
-      geographicMarket: startupDetails.geographicMarket || '',
-      existingCompetitors: startupDetails.existingCompetitors || '',
-      revenueModel: startupDetails.revenueModel || '',
-      estimatedPricing: startupDetails.estimatedPricing || '',
-      availableFunding: startupDetails.availableFunding || '',
-      monthlyBurnCapacity: startupDetails.monthlyBurnCapacity || '',
-      platformType: startupDetails.platformType || [],
-      techComplexity: startupDetails.techComplexity || '',
-      mvpTimeline: startupDetails.mvpTimeline || '',
-      scalabilityGoal: startupDetails.scalabilityGoal || '',
-      acquisitionStrategy: startupDetails.acquisitionStrategy || '',
-      startupStage: startupDetails.startupStage || '',
-    });
-  }, [startupDetails]);
+  // NOTE: formData is intentionally NOT re-synced from context on every change
+  // because that causes a React setState-during-render loop.
+  // formData is initialized from context on mount (useState default) and
+  // only pushed back to context on Next/Submit click.
 
   // Capture standard keyboard Enter key to advance naturally
   useEffect(() => {
@@ -286,10 +269,10 @@ const OnboardingDetails = () => {
         setCurrentFieldIndex(nextStepIdx);
         setAnimateClass('opacity-100 translate-x-0 transition-all duration-300');
       } else {
-        // Final Submit: Save everything and navigate to step 3
+        // Final Submit: Save everything and directly trigger analysis
         updateStartupDetailsBulk(formData);
-        setCurrentStep(0); // Onboarding details successfully completed
-        navigate('/startup/validate');
+        setCurrentStep(0);
+        navigate('/analysis/loader');
       }
     }, 300);
   };
@@ -315,13 +298,13 @@ const OnboardingDetails = () => {
   };
 
   const handlePillSingleSelect = (val) => {
+    // Only update local state — context will be updated on Next button click
     setFormData((prev) => ({ ...prev, [currentField.id]: val }));
     setError('');
-    // Auto-save changes directly
-    updateStartupDetails(currentField.id, val);
   };
 
   const handlePillMultiToggle = (val) => {
+    // Only update local state — context will be updated on Next button click
     setFormData((prev) => {
       const activePills = [...(prev[currentField.id] || [])];
       let updatedPills;
@@ -330,7 +313,6 @@ const OnboardingDetails = () => {
       } else {
         updatedPills = [...activePills, val];
       }
-      updateStartupDetails(currentField.id, updatedPills);
       return { ...prev, [currentField.id]: updatedPills };
     });
     setError('');
@@ -511,7 +493,7 @@ const OnboardingDetails = () => {
             >
               {currentFieldIndex === fields.length - 1 ? (
                 <>
-                  Complete Onboarding
+                  Run Analysis
                   <Check className="h-4.5 w-4.5" />
                 </>
               ) : (
