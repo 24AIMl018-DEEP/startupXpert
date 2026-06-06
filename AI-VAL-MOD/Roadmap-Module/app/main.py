@@ -2,7 +2,12 @@ import os
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+# /app/Roadmap-Module/app/main.py
+# parents[0] = /app/Roadmap-Module/app  ← module's own app dir (for schema, workflow, services)
+# parents[2] = /app                     ← AI-VAL-MOD root (for shared package)
+_here = Path(__file__).resolve()
+sys.path.insert(0, str(_here.parent))       # Roadmap-Module/app
+sys.path.insert(0, str(_here.parents[2]))   # AI-VAL-MOD (shared lives here)
 
 import logging
 from fastapi import FastAPI, HTTPException

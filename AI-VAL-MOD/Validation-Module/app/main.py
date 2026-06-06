@@ -2,8 +2,12 @@ import os
 import sys
 from pathlib import Path
 
-# ensure repo root is in sys.path so `shared` package is importable
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+# /app/Validation-Module/app/main.py
+# parents[0] = /app/Validation-Module/app  ← module's own app dir (for schema, workflow, services)
+# parents[2] = /app                        ← AI-VAL-MOD root (for shared package)
+_here = Path(__file__).resolve()
+sys.path.insert(0, str(_here.parent))       # Validation-Module/app
+sys.path.insert(0, str(_here.parents[2]))   # AI-VAL-MOD (shared lives here)
 
 import logging
 from contextlib import asynccontextmanager
