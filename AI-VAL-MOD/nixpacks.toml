@@ -2,9 +2,10 @@
 nixPkgs = ["python311", "python311Packages.pip", "gcc", "libstdcxx5"]
 
 [phases.install]
-cmds = ["python -m ensurepip --upgrade", "python -m pip install --upgrade pip", "python -m pip install -r requirements.txt"]
+cmds = [
+  "python -m pip install --upgrade pip",
+  "python -m pip install -r AI-VAL-MOD/requirements.txt"
+]
 
 [start]
-# Railway sets MODULE=validation or MODULE=roadmap via env var
-# Default to validation if not set
-cmd = "sh -c 'if [ \"$MODULE\" = \"roadmap\" ]; then cd Roadmap-Module/app && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1; else cd Validation-Module/app && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1; fi'"
+cmd = "sh -c 'if [ \"$MODULE\" = \"roadmap\" ]; then cd AI-VAL-MOD/Roadmap-Module/app && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1; else cd AI-VAL-MOD/Validation-Module/app && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1; fi'"
