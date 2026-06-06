@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStartup } from '../context/StartupContext';
+import { useStartupStorage } from '../hooks/useStartupStorage';
 import Navbar from '../components/Navbar';
 import { Compass, CheckCircle2, XCircle } from 'lucide-react';
 
@@ -17,7 +18,8 @@ const STEPS = [
 
 const AnalysisLoader = () => {
   const navigate  = useNavigate();
-  const { startupDetails, onboardingRole, runAnalysis } = useStartup();
+  const { startupDetails, onboardingRole, runAnalysis, saveDraft } = useStartup();
+  const { saveDraft: saveLocalDraft } = useStartupStorage();
 
   const [progress,   setProgress]   = useState(0);
   const [activeStep, setActiveStep] = useState(0);
@@ -27,6 +29,11 @@ const AnalysisLoader = () => {
   useEffect(() => {
     if (calledRef.current) return;
     calledRef.current = true;
+
+    // Save form data to localStorage BEFORE calling API
+    // So if the call fails, user can restore their input
+    saveDraft(onboardingRole, startupDetails, 3);  // context saveDraft (email-scoped)
+    saveLocalDraft(onboardingRole, startupDetails, 3); // hook saveDraft (fallback key)
 
     // Smooth progress + step animation (runs independently of API)
     const stepTimer = setInterval(() => {
@@ -75,6 +82,9 @@ const AnalysisLoader = () => {
             <div className="flex flex-col items-center gap-4 py-6">
               <XCircle className="h-14 w-14 text-rose-400" />
               <p className="text-sm text-rose-300 font-semibold">{error}</p>
+              <p className="text-xs text-gray-500">
+                ✓ Your startup data has been saved locally — it will be pre-filled when you retry.
+              </p>
               <button
                 onClick={() => navigate('/onboarding/details')}
                 className="mt-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-bold text-white hover:bg-indigo-500"
