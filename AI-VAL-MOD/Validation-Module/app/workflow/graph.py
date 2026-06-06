@@ -35,11 +35,11 @@ ANALYSIS_NODE_NAMES = ["feasibility", "market_opportunity", "competition_analysi
 
 def query_collector_node(state: GraphState) -> dict:
     print(f"[Node:query_collector] done — {len(state.get('query_results', []))} results")
-    return {}
+    return {"query_results": state.get("query_results", [])}
 
 def analysis_collector_node(state: GraphState) -> dict:
     print(f"[Node:analysis_collector] done — {len(state.get('analysis_results', []))} results")
-    return {}
+    return {"analysis_results": state.get("analysis_results", [])}
 
 
 def _build_graph():
