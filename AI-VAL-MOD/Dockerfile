@@ -7,18 +7,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-# Copy and install dependencies first (layer cache)
+# Copy and install dependencies (cached layer)
 COPY AI-VAL-MOD/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Copy all source code
+# Copy all backend source code
 COPY AI-VAL-MOD/ .
 
-# Railway injects PORT and MODULE at runtime
-# MODULE=roadmap → Roadmap-Module, anything else → Validation-Module
-CMD sh -c 'if [ "$MODULE" = "roadmap" ]; then \
-    cd Roadmap-Module/app && python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1; \
-  else \
-    cd Validation-Module/app && python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1; \
-  fi'
+# MODULE=roadmap → Roadmap-Module  |  anything else → Validation-Module
+CMD ["/bin/sh", "-c", "if [ \"$MODULE\" = \"roadmap\" ]; then cd Roadmap-Module/app && python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1; else cd Validation-Module/app && python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 1; fi"]
