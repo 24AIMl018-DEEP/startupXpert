@@ -5,4 +5,6 @@ nixPkgs = ["python311", "gcc", "libstdcxx5"]
 cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
 
 [start]
-cmd = "uvicorn Validation-Module.app.main:app --host 0.0.0.0 --port $PORT --workers 1"
+# Railway sets MODULE=validation or MODULE=roadmap via env var
+# Default to validation if not set
+cmd = "sh -c 'if [ \"$MODULE\" = \"roadmap\" ]; then cd Roadmap-Module/app && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1; else cd Validation-Module/app && uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1; fi'"

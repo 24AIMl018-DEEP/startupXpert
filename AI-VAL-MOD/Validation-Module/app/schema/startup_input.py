@@ -1,8 +1,9 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 class StartupInput(BaseModel):
+    user_id: Optional[str] = None   # Supabase auth user UUID — links idea to account
     full_name: str
     age: int
     gender: str

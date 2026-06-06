@@ -31,6 +31,17 @@ class SyncAgent(BaseAgent):
                 task.setdefault("unblocks",   [])
             return tasks
 
+        # Guard: _parse_json may return a dict if model wrapped the array
+        if isinstance(sync_results, dict):
+            sync_results = next((v for v in sync_results.values() if isinstance(v, list)), [])
+        if not sync_results or not isinstance(sync_results[0], dict):
+            print(f"[{self.name}] Unexpected sync_results format — defaulting all tasks to Ready")
+            for task in tasks:
+                task.setdefault("status",     "Ready")
+                task.setdefault("blocked_by", [])
+                task.setdefault("unblocks",   [])
+            return tasks
+
         sync_map = {s["task_id"]: s for s in sync_results}
         for task in tasks:
             s = sync_map.get(task["task_id"], {})

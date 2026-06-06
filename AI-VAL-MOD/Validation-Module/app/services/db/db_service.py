@@ -64,6 +64,7 @@ def _insert(table: str, payload: dict) -> Optional[dict]:
 def save_startup_input(data: StartupInput) -> Optional[str]:
     """Insert startup_input row. Returns session_id (uuid)."""
     payload = {
+        "user_id":                      _sf(data.user_id, 36) if data.user_id else None,
         "full_name":                    _sf(data.full_name, 200),
         "age":                          data.age,
         "gender":                       _sf(data.gender, 50),
@@ -93,7 +94,7 @@ def save_startup_input(data: StartupInput) -> Optional[str]:
     }
     row = _insert("startup_input", payload)
     if row:
-        logger.info("[DB:startup_input] saved — session_id=%s", row["id"])
+        logger.info("[DB:startup_input] saved — session_id=%s user_id=%s", row["id"], data.user_id)
         return row["id"]
     return None
 

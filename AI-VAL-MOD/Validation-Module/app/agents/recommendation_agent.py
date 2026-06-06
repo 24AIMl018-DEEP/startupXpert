@@ -1,7 +1,7 @@
 import json
 import re
 from typing import Dict, List
-from shared.core.llm_factory import get_llm
+from shared.core.llm_factory import call_llm_with_fallback
 from schema.prompts.recommendation_prompt import RecommendationPrompt
 
 
@@ -67,7 +67,7 @@ class RecommendationAgent:
             innovation_summary    = inn.get("summary", ""),
         )
 
-        raw = get_llm(tier=2, temperature=0.1)(prompt)
+        raw = call_llm_with_fallback(prompt, tier=2, temperature=0.1)
         text = raw.strip()
         fenced = re.search(r"```(?:json)?\s*([\s\S]*?)```", text)
         if fenced:

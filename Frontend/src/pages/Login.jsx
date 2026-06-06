@@ -7,18 +7,18 @@ import { Lock, Mail, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { signInUser } from '../services/authService';
 
 const Login = () => {
-  const { loginUser, isLoggedIn, setLoading } = useStartup();
+  const { loginUser, isLoggedIn, user, setLoading } = useStartup();
   const navigate = useNavigate();
 
   // Redirect authenticated sessions immediately (Auth Redirect)
   useEffect(() => {
-    if (isLoggedIn) {
-      const savedHistory = localStorage.getItem('startup_history');
+    if (isLoggedIn && user?.email) {
+      const savedHistory = localStorage.getItem(`startup_history_${user.email}`) || localStorage.getItem('startup_history');
       const hasHistory = savedHistory ? JSON.parse(savedHistory).length > 0 : false;
-      // Returning user (has history) → dashboard, new user → onboarding
-      navigate(hasHistory ? '/dashboard' : '/onboarding/role', { replace: true });
+      const wasCompleted = user?.onboardingCompleted === true;
+      navigate((hasHistory || wasCompleted) ? '/dashboard' : '/onboarding/role', { replace: true });
     }
-  }, [isLoggedIn, navigate]);
+  }, [isLoggedIn, user?.email, navigate]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -78,12 +78,18 @@ const Login = () => {
       const fullName =
         data.user?.user_metadata?.full_name ||
         formData.email.split('@')[0].replace(/^./, (c) => c.toUpperCase());
-      loginUser(formData.email, formData.password, fullName);
+      // Pass the Supabase UUID so ideas are linked to this account
+      loginUser(formData.email, formData.password, fullName, data.user?.id || null);
 
-      // New users (no history) → onboarding, returning users → dashboard
-      const savedHistory = localStorage.getItem('startup_history');
+      // Onboarding not complete → send to onboarding, else dashboard
+      const savedHistory = localStorage.getItem(`startup_history_${formData.email}`) || localStorage.getItem('startup_history');
       const hasHistory = savedHistory ? JSON.parse(savedHistory).length > 0 : false;
-      navigate(hasHistory ? '/dashboard' : '/onboarding/role');
+
+      // Also check if onboarding flag was previously saved for this user
+      const prevUser = localStorage.getItem(`startup_user_${formData.email}`);
+      const wasCompleted = prevUser ? JSON.parse(prevUser)?.onboardingCompleted === true : false;
+
+      navigate((hasHistory || wasCompleted) ? '/dashboard' : '/onboarding/role');
     } catch (err) {
       setSubmitError(err.message || 'Invalid email or password.');
     } finally {

@@ -208,6 +208,7 @@ async def run_pipeline(startup_data: StartupInput) -> PipelineState:
     print(f"\n{'='*60}\n[Pipeline] COMPLETE — score={aggregate}/100\n{'='*60}\n")
 
     pipeline_state = PipelineState(
+        session_id                 = session_id,
         status                     = "success",
         startup_name               = startup_data.startup_name,
         pitch_state                = pitch_state,

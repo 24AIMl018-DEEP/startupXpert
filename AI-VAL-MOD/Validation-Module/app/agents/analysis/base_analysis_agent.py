@@ -1,11 +1,8 @@
-import time
 from typing import Dict, List
-from shared.core.llm_factory import get_llm
+from shared.core.llm_factory import call_llm_with_fallback
 from services.agent_services.vector_context import build_vector_context
 from services.agent_services.json_builder import build_limited_json
 from services.agent_services.output_parser import parse_llm_output
-
-_RETRY_DELAYS = [2, 5, 10]
 
 
 class BaseAnalysisAgent:
@@ -19,18 +16,7 @@ class BaseAnalysisAgent:
         raise NotImplementedError
 
     def _call_llm(self, prompt: str) -> str:
-        last_err = None
-        for attempt, delay in enumerate([0] + _RETRY_DELAYS):
-            if delay:
-                print(f"[AnalysisAgent:{self.name}] Retry {attempt} after {delay}s...")
-                time.sleep(delay)
-            try:
-                return get_llm(tier=self.llm_tier, temperature=0.2)(prompt)
-            except Exception as e:
-                last_err = e
-                if "429" not in str(e) and "rate" not in str(e).lower():
-                    break
-        raise RuntimeError(f"LLM call failed after retries: {last_err}")
+        return call_llm_with_fallback(prompt, tier=self.llm_tier, temperature=0.2)
 
     def run(self, pitch: str, startup_data: Dict) -> Dict:
         print(f"[AnalysisAgent:{self.name}] Starting — llm_tier={self.llm_tier}")

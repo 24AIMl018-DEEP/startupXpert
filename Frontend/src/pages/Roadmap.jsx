@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ReactFlow, { MiniMap, Controls, Background, MarkerType, Handle, Position } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useStartup } from '../context/StartupContext';
@@ -142,6 +143,7 @@ const TeamModal = ({ onConfirm, onCancel, isGenerating }) => {
 
 // ── Main Roadmap Page ─────────────────────────────────────────────────────────
 const Roadmap = () => {
+  const navigate = useNavigate();
   const { user, startupDetails, analysisScores, roadmapNodes, roadmapData, isGeneratingRoadmap, generateRoadmap, updateRoadmapNode, addRoadmapNode, deleteRoadmapNode, manageSubTask, manageNote } = useStartup();
   const { showToast } = useToast();
 
@@ -216,8 +218,20 @@ const Roadmap = () => {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleGenerateClick = () => {
-    if (!localStorage.getItem('validation_session_id')) {
-      showToast('Run validation first before generating roadmap.', 'error'); return;
+    // Gate: must have a validated session for this user
+    const sessionKey = user?.email
+      ? `validation_session_id_${user.email}`
+      : 'validation_session_id';
+    const hasSession =
+      localStorage.getItem(sessionKey) ||
+      localStorage.getItem('validation_session_id');
+
+    if (!hasSession) {
+      showToast(
+        'Validate an idea first — roadmap generation requires a completed validation.',
+        'error'
+      );
+      return;
     }
     setShowTeamModal(true);
   };
@@ -292,23 +306,58 @@ const Roadmap = () => {
           </div>
         )}
 
-        {/* Empty State */}
-        {roadmapNodes.length === 0 && !isGeneratingRoadmap && (
-          <div className="rounded-2xl border border-indigo-500/10 bg-[#0e0e16]/60 p-16 text-center space-y-5">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-indigo-500/20 bg-indigo-500/5 text-indigo-400">
-              <Compass className="h-8 w-8" />
+        {/* Empty State — two variants: no validation vs validated but no roadmap */}
+        {roadmapNodes.length === 0 && !isGeneratingRoadmap && (() => {
+          const sessionKey = user?.email
+            ? `validation_session_id_${user.email}`
+            : 'validation_session_id';
+          const hasValidatedSession =
+            !!(localStorage.getItem(sessionKey) || localStorage.getItem('validation_session_id'));
+
+          if (!hasValidatedSession) {
+            // No validated idea at all
+            return (
+              <div className="rounded-2xl border border-amber-500/15 bg-amber-950/10 p-16 text-center space-y-5">
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/5 text-amber-400">
+                  <AlertTriangle className="h-8 w-8" />
+                </div>
+                <div className="space-y-2 max-w-sm mx-auto">
+                  <h3 className="text-base font-bold text-white">Validate an Idea First</h3>
+                  <p className="text-xs text-gray-500 leading-relaxed">
+                    Your roadmap is built on validated data. Complete the idea validation process before generating a roadmap.
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate('/onboarding/role')}
+                  className="inline-flex items-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white px-6 py-3 text-xs font-bold uppercase tracking-wider transition-all"
+                >
+                  <Plus className="h-4 w-4" />Validate My Idea
+                </button>
+              </div>
+            );
+          }
+
+          // Has a validated idea, just no roadmap generated yet
+          return (
+            <div className="rounded-2xl border border-indigo-500/10 bg-[#0e0e16]/60 p-16 text-center space-y-5">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-indigo-500/20 bg-indigo-500/5 text-indigo-400">
+                <Compass className="h-8 w-8" />
+              </div>
+              <div className="space-y-2 max-w-sm mx-auto">
+                <h3 className="text-base font-bold text-white">No Roadmap Generated Yet</h3>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                  Your idea is validated. Click <span className="text-indigo-400 font-semibold">Generate Roadmap</span> to build a personalized execution plan — add your team and the AI assigns tasks by role and skill.
+                </p>
+              </div>
+              <button
+                onClick={handleGenerateClick}
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 text-xs font-bold uppercase tracking-wider shadow-lg shadow-indigo-600/10 transition-all"
+              >
+                <Sparkles className="h-4 w-4" />Generate My Roadmap
+              </button>
             </div>
-            <div className="space-y-2 max-w-sm mx-auto">
-              <h3 className="text-base font-bold text-white">No Roadmap Yet</h3>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Click <span className="text-indigo-400 font-semibold">Generate Roadmap</span> to create a personalized execution plan. You'll add your team members and the AI will assign tasks based on roles and skills.
-              </p>
-            </div>
-            <button onClick={handleGenerateClick} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 text-xs font-bold uppercase tracking-wider shadow-lg shadow-indigo-600/10 transition-all">
-              <Sparkles className="h-4 w-4" />Generate My Roadmap
-            </button>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Loading state */}
         {isGeneratingRoadmap && (
@@ -397,49 +446,76 @@ const Roadmap = () => {
                 </div>
 
                 <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {activeNode.tasks?.length > 0 ? activeNode.tasks.map(t => (
-                    <div key={t.id} className="rounded-lg border border-indigo-500/5 bg-[#0a0a0f] overflow-hidden">
-                      {/* Task row */}
-                      <div className="flex items-start gap-2.5 p-2.5">
-                        <input type="checkbox" checked={t.completed} onChange={() => manageSubTask(selectedNodeId, 'toggle', { id: t.id })} className="mt-0.5 h-3.5 w-3.5 rounded border-indigo-500/30 text-indigo-600 cursor-pointer shrink-0" />
-                        <div className="flex-grow min-w-0">
-                          <p className={`text-xs leading-relaxed ${t.completed ? 'text-gray-500 line-through' : 'text-gray-200'}`}>{t.text}</p>
-                          {/* Rich metadata from backend */}
-                          <div className="flex flex-wrap gap-1.5 mt-1.5">
-                            {t.assignedTo && (
-                              <span className="flex items-center gap-1 rounded bg-indigo-950 border border-indigo-500/20 px-1.5 py-0.5 text-[9px] font-bold text-indigo-300">
-                                <User className="h-2.5 w-2.5" />{t.assignedTo}
-                              </span>
+                  {activeNode.tasks?.length > 0 ? activeNode.tasks.map(t => {
+                    const isBlocked = t.status === 'Blocked' || t.depStatus === 'Blocked';
+                    return (
+                      <div key={t.id} className="rounded-lg border border-indigo-500/5 bg-[#0a0a0f] overflow-hidden">
+                        {/* Task row */}
+                        <div className="flex items-start gap-2.5 p-2.5">
+                          <input type="checkbox" checked={t.completed} onChange={() => manageSubTask(selectedNodeId, 'toggle', { id: t.id })} className="mt-0.5 h-3.5 w-3.5 rounded border-indigo-500/30 text-indigo-600 cursor-pointer shrink-0" />
+                          <div className="flex-grow min-w-0 text-left">
+                            <p className={`text-xs leading-relaxed ${t.completed ? 'text-gray-500 line-through' : 'text-gray-200'}`}>{t.text}</p>
+                            
+                            {/* Rich metadata from backend */}
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {t.assignedTo && t.assignedTo !== 'Unassigned' && (
+                                <span className="flex items-center gap-1 rounded bg-indigo-950 border border-indigo-500/20 px-1.5 py-0.5 text-[9px] font-bold text-indigo-300">
+                                  <User className="h-2.5 w-2.5" />
+                                  {t.assignedTo}
+                                  {t.assigneeRole && <span className="text-[8px] text-indigo-400 font-medium">({t.assigneeRole})</span>}
+                                </span>
+                              )}
+                              {t.priority && (
+                                <span className={`rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase ${t.priority === 'High' ? 'bg-rose-950 border-rose-500/20 text-rose-300' : t.priority === 'Medium' ? 'bg-amber-950 border-amber-500/20 text-amber-300' : 'bg-slate-900 border-slate-500/20 text-slate-300'}`}>
+                                  {t.priority}
+                                </span>
+                              )}
+                              {t.complexity && (
+                                <span className="rounded bg-cyan-950 border border-cyan-500/20 px-1.5 py-0.5 text-[9px] font-bold text-cyan-300">
+                                  {t.complexity} Complexity
+                                </span>
+                              )}
+                              {t.costImpact && t.costImpact !== 'None' && (
+                                <span className="rounded bg-purple-950 border border-purple-500/20 px-1.5 py-0.5 text-[9px] font-bold text-purple-300">
+                                  {t.costImpact} Cost
+                                </span>
+                              )}
+                              {t.depStatus && (
+                                <span className={`flex items-center gap-1 text-[9px] font-bold ${depStatusColor(t.depStatus)}`}>
+                                  {isBlocked ? <Lock className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
+                                  {t.depStatus}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Blocking dependencies list */}
+                            {isBlocked && t.blockedBy && t.blockedBy.length > 0 && (
+                              <div className="mt-2 text-[9px] font-medium text-rose-400 bg-rose-950/10 border border-rose-500/10 px-2 py-1 rounded flex items-center gap-1">
+                                <span>⚠️ Blocked by:</span>
+                                <span className="truncate max-w-[200px]" title={t.blockedBy.join(', ')}>
+                                  {t.blockedBy.map(bId => bId.replace(/^.*?_task_/, 'Task ')).join(', ')}
+                                </span>
+                              </div>
                             )}
-                            {t.priority && (
-                              <span className={`rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase ${t.priority === 'High' ? 'bg-rose-950 border-rose-500/20 text-rose-300' : t.priority === 'Medium' ? 'bg-amber-950 border-amber-500/20 text-amber-300' : 'bg-slate-900 border-slate-500/20 text-slate-300'}`}>
-                                {t.priority}
-                              </span>
+
+                            {/* Description expand */}
+                            {t.description && (
+                              <button onClick={() => setExpandedTaskId(expandedTaskId === t.id ? null : t.id)} className="flex items-center gap-1 text-[9px] text-gray-600 hover:text-indigo-400 mt-1 transition-colors">
+                                {expandedTaskId === t.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                                {expandedTaskId === t.id ? 'Hide' : 'Details'}
+                              </button>
                             )}
-                            {t.depStatus && (
-                              <span className={`flex items-center gap-1 text-[9px] font-bold ${depStatusColor(t.depStatus)}`}>
-                                {t.depStatus === 'Blocked' ? <Lock className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
-                                {t.depStatus}
-                              </span>
+                            {expandedTaskId === t.id && t.description && (
+                              <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed border-t border-indigo-500/5 pt-1.5">{t.description}</p>
                             )}
                           </div>
-                          {/* Description expand */}
-                          {t.description && (
-                            <button onClick={() => setExpandedTaskId(expandedTaskId === t.id ? null : t.id)} className="flex items-center gap-1 text-[9px] text-gray-600 hover:text-indigo-400 mt-1 transition-colors">
-                              {expandedTaskId === t.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                              {expandedTaskId === t.id ? 'Hide' : 'Details'}
-                            </button>
-                          )}
-                          {expandedTaskId === t.id && t.description && (
-                            <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed border-t border-indigo-500/5 pt-1.5">{t.description}</p>
-                          )}
+                          <button onClick={() => manageSubTask(selectedNodeId, 'delete', { id: t.id })} className="text-gray-600 hover:text-rose-400 shrink-0 p-0.5">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
-                        <button onClick={() => manageSubTask(selectedNodeId, 'delete', { id: t.id })} className="text-gray-600 hover:text-rose-400 shrink-0 p-0.5">
-                          <Trash2 className="h-3 w-3" />
-                        </button>
                       </div>
-                    </div>
-                  )) : (
+                    );
+                  }) : (
                     <p className="text-xs text-gray-600 italic py-2">No tasks. Add one below.</p>
                   )}
                 </div>

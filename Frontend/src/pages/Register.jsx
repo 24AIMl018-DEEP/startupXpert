@@ -134,7 +134,7 @@ const Register = () => {
         return;
       }
 
-      registerUser(formData.fullName, formData.email, formData.role);
+      registerUser(formData.fullName, formData.email, formData.role, data.user?.id || null);
       navigate('/onboarding/role'); // New users must complete onboarding
     } catch (err) {
       setSubmitError(err.message || 'Registration failed. Please try again.');

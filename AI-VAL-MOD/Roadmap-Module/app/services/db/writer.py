@@ -1,5 +1,5 @@
 """
-Central DB Writer — all INSERT operations go through here.
+Central DB Writer — all INSERT/UPDATE operations go through here.
 Agents and pipeline call this, never supabase directly.
 """
 import logging
@@ -19,6 +19,19 @@ def _insert(table: str, payload: dict) -> Optional[Dict]:
         return None
     except Exception as e:
         logger.error("[DBWriter:%s] Error — %s", table, e)
+        return None
+
+
+def _update(table: str, row_id: str, payload: dict) -> Optional[Dict]:
+    try:
+        from shared.db.supabase_client import get_supabase
+        res = get_supabase().table(table).update(payload).eq("id", row_id).execute()
+        if res.data:
+            return res.data[0]
+        logger.error("[DBWriter:%s] update returned no data for id=%s", table, row_id)
+        return None
+    except Exception as e:
+        logger.error("[DBWriter:%s] Update Error — %s", table, e)
         return None
 
 
@@ -70,3 +83,28 @@ def write_tasks(branch_id: str, tasks: List[Dict]) -> None:
             "unblocks":        task.get("unblocks", []),
         })
     logger.info("[DBWriter:roadmap_tasks] wrote %d tasks for branch_id=%s", len(tasks), branch_id)
+
+
+# ── Roadmap edits (frontend node editing → DB sync) ────────────────────────────
+
+def update_branch(branch_id: str, fields: Dict) -> Optional[Dict]:
+    """Patch allowed fields on a roadmap_branches row."""
+    allowed = {"status", "summary"}
+    patch = {k: v for k, v in fields.items() if k in allowed}
+    if not patch:
+        return None
+    return _update("roadmap_branches", branch_id, patch)
+
+
+def update_task(task_id: str, fields: Dict) -> Optional[Dict]:
+    """Patch allowed fields on a roadmap_tasks row."""
+    allowed = {
+        "title", "description", "timeline", "priority",
+        "assigned_to", "assignee_role", "estimated_hours",
+        "complexity", "cost_impact", "dep_status", "blocked_by", "unblocks"
+    }
+    patch = {k: v for k, v in fields.items() if k in allowed}
+    if not patch:
+        return None
+    return _update("roadmap_tasks", task_id, patch)
+

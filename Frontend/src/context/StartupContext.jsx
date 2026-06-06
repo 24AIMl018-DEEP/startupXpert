@@ -1,6 +1,6 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useToast } from './ToastContext';
-import { submitValidation, submitRoadmap } from '../services/startupApi';
+import { submitValidation, submitRoadmap, patchBranch, patchTask } from '../services/startupApi';
 import { getCurrentUserId } from '../services/authService';
 
 const StartupContext = createContext(null);
@@ -13,186 +13,34 @@ export const useStartup = () => {
   return context;
 };
 
+// Migration utility helper for localStorage legacy keys to scoped keys
+const migrateLegacyData = (email) => {
+  if (!email) return;
+  const keys = ['startup_history', 'startup_roadmap', 'validation_session_id', 'startup_draft'];
+  keys.forEach(key => {
+    const legacyValue = localStorage.getItem(key);
+    const scopedKey = `${key}_${email}`;
+    const scopedValue = localStorage.getItem(scopedKey);
+    if (legacyValue && !scopedValue) {
+      localStorage.setItem(scopedKey, legacyValue);
+      console.log(`Migrated legacy key: ${key} to ${scopedKey}`);
+    }
+  });
+};
+
 export const StartupProvider = ({ children }) => {
   const { showToast } = useToast();
-
-  // Default Roadmap Milestones Structure (10 Core Stages + parent-child hierarchy)
-  const defaultRoadmapNodes = [
-    {
-      id: 'root',
-      parentId: null,
-      title: 'Startup Launchpad',
-      description: 'The central mission command center of your venture.',
-      status: 'In Progress',
-      priority: 'High',
-      isExpanded: true,
-      tasks: [],
-      notes: [],
-      recommendations: 'This is the core foundation node. Launch your branches to build your startup operating system.'
-    },
-    {
-      id: 'stage-1',
-      parentId: 'root',
-      title: 'Idea Research',
-      description: 'Validate the core problem and design the initial solution concept.',
-      status: 'Completed',
-      priority: 'High',
-      isExpanded: true,
-      tasks: [
-        { id: 't1-1', text: 'Define core value proposition', completed: true },
-        { id: 't1-2', text: 'Create problem statement canvas', completed: true }
-      ],
-      notes: [
-        { id: 'n1-1', text: 'Focus heavily on automated visual creator tools.', timestamp: Date.now() - 3600000 }
-      ],
-      recommendations: 'Verify target audience pain points through online surveys, social discussions, or direct outreach.'
-    },
-    {
-      id: 'stage-2',
-      parentId: 'stage-1',
-      title: 'Market Validation',
-      description: 'Assess size of the target market, target demographics, and willingness to pay.',
-      status: 'In Progress',
-      priority: 'High',
-      isExpanded: true,
-      tasks: [
-        { id: 't2-1', text: 'Conduct 10 buyer persona interviews', completed: true },
-        { id: 't2-2', text: 'Calculate TAM, SAM, SOM metrics', completed: false },
-        { id: 't2-3', text: 'Deploy static landing page test', completed: false }
-      ],
-      notes: [],
-      recommendations: 'Keep validation tests simple. Launch a signup form page and track visitor conversion ratios.'
-    },
-    {
-      id: 'stage-3',
-      parentId: 'stage-2',
-      title: 'Competitor Analysis',
-      description: 'Map competitor positions, research pricing schemes, and identify USPs.',
-      status: 'Pending',
-      priority: 'Medium',
-      isExpanded: true,
-      tasks: [
-        { id: 't3-1', text: 'Build feature comparison spreadsheet', completed: false },
-        { id: 't3-2', text: 'Analyze competitor reviews on G2/Capterra', completed: false }
-      ],
-      notes: [],
-      recommendations: 'Map direct vs indirect competitors and highlight your unfair distribution or pricing advantage.'
-    },
-    {
-      id: 'stage-4',
-      parentId: 'root',
-      title: 'MVP Development',
-      description: 'Scope core features and build a working functional prototype of your app.',
-      status: 'Pending',
-      priority: 'High',
-      isExpanded: true,
-      tasks: [
-        { id: 't4-1', text: 'Draft system architecture map', completed: false },
-        { id: 't4-2', text: 'Create UI wireframes in Figma', completed: false },
-        { id: 't4-3', text: 'Build core frontend dashboard view', completed: false }
-      ],
-      notes: [],
-      recommendations: 'Minimize product scopes. Only build features that directly resolve the primary problem statement.'
-    },
-    {
-      id: 'stage-5',
-      parentId: 'stage-4',
-      title: 'User Testing & Feedback',
-      description: 'Recruit beta testers, record session video walkthroughs, and collect reviews.',
-      status: 'Pending',
-      priority: 'Medium',
-      isExpanded: true,
-      tasks: [
-        { id: 't5-1', text: 'Onboard 5-10 beta cohort users', completed: false },
-        { id: 't5-2', text: 'Track conversion drop-offs', completed: false }
-      ],
-      notes: [],
-      recommendations: 'Watch early users interact with your software live without giving them instructions to observe design friction.'
-    },
-    {
-      id: 'stage-6',
-      parentId: 'stage-5',
-      title: 'Business Registration',
-      description: 'Incorporate business structure, draft terms of service, and open bank accounts.',
-      status: 'Pending',
-      priority: 'Low',
-      isExpanded: true,
-      tasks: [
-        { id: 't6-1', text: 'Incorporate LLC or Private Limited', completed: false },
-        { id: 't6-2', text: 'Draft Privacy Policy and Terms of Service', completed: false }
-      ],
-      notes: [],
-      recommendations: 'Use online registration services to automate incorporating, avoiding heavy early legal fees.'
-    },
-    {
-      id: 'stage-7',
-      parentId: 'root',
-      title: 'Go-To-Market',
-      description: 'Create marketing content plans, launch ads, and set up brand channels.',
-      status: 'Pending',
-      priority: 'High',
-      isExpanded: true,
-      tasks: [
-        { id: 't7-1', text: 'Build email waiting list database', completed: false },
-        { id: 't7-2', text: 'Publish 3 search engine optimized articles', completed: false }
-      ],
-      notes: [],
-      recommendations: 'Prioritize content marketing and online community distributions to bootstrap organic acquisitions.'
-    },
-    {
-      id: 'stage-8',
-      parentId: 'stage-7',
-      title: 'Revenue & Pricing',
-      description: 'Set up subscriptions and pricing tables, and integrate stripe checkout forms.',
-      status: 'Pending',
-      priority: 'High',
-      isExpanded: true,
-      tasks: [
-        { id: 't8-1', text: 'Configure Stripe billing configurations', completed: false },
-        { id: 't8-2', text: 'Deploy public pricing tier card grid', completed: false }
-      ],
-      notes: [],
-      recommendations: 'Offer a yearly billing tier with high discounts to boost initial cash reserves.'
-    },
-    {
-      id: 'stage-9',
-      parentId: 'root',
-      title: 'Funding Preparation',
-      description: 'Formulate financial models, outline investment sheets, and draft pitch deck layouts.',
-      status: 'Pending',
-      priority: 'Medium',
-      isExpanded: true,
-      tasks: [
-        { id: 't9-1', text: 'Create 12-page investor pitch presentation', completed: false },
-        { id: 't9-2', text: 'Project 12-month burn calculations', completed: false }
-      ],
-      notes: [],
-      recommendations: 'Prepare a 1-page executive memo summarizing validation scores, revenue margins, and growth metrics.'
-    },
-    {
-      id: 'stage-10',
-      parentId: 'stage-9',
-      title: 'Growth & Scaling',
-      description: 'Scale operational pipelines, optimize onboarding conversions, and execute partnership integrations.',
-      status: 'Pending',
-      priority: 'Medium',
-      isExpanded: true,
-      tasks: [
-        { id: 't10-1', text: 'Configure segment tracking events', completed: false },
-        { id: 't10-2', text: 'Partner with complementary agencies', completed: false }
-      ],
-      notes: [],
-      recommendations: 'Implement referral systems where founders earn usage bonuses for inviting new colleagues.'
-    }
-  ];
 
   // 1. Authentication & User Profile States (persisted under startup_user & startupxpert_user)
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('startup_user') || localStorage.getItem('startupxpert_user');
     const parsed = savedUser ? JSON.parse(savedUser) : null;
     if (parsed) {
+      if (parsed.email) {
+        migrateLegacyData(parsed.email);
+      }
       if (parsed.onboardingCompleted === undefined) {
-        const savedHistory = localStorage.getItem('startup_history');
+        const savedHistory = localStorage.getItem(`startup_history_${parsed.email}`) || localStorage.getItem('startup_history');
         const hasHistory = savedHistory ? JSON.parse(savedHistory).length > 0 : false;
         parsed.onboardingCompleted = hasHistory;
       }
@@ -226,18 +74,28 @@ export const StartupProvider = ({ children }) => {
 
   // Roadmap State — empty by default, populated only when user generates from backend
   const [roadmapNodes, setRoadmapNodes] = useState(() => {
-    const saved = localStorage.getItem('startup_roadmap');
-    return saved ? JSON.parse(saved) : [];
+    const savedUser = localStorage.getItem('startup_user') || localStorage.getItem('startupxpert_user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    if (parsedUser && parsedUser.email) {
+      migrateLegacyData(parsedUser.email);
+      const saved = localStorage.getItem(`startup_roadmap_${parsedUser.email}`);
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
   });
   const [roadmapData, setRoadmapData]   = useState(null);  // full backend roadmap response
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
 
   // Auto-save roadmap to localStorage
   useEffect(() => {
-    if (roadmapNodes.length > 0) {
-      localStorage.setItem('startup_roadmap', JSON.stringify(roadmapNodes));
+    if (user?.email) {
+      if (roadmapNodes.length > 0) {
+        localStorage.setItem(`startup_roadmap_${user.email}`, JSON.stringify(roadmapNodes));
+      } else {
+        localStorage.removeItem(`startup_roadmap_${user.email}`);
+      }
     }
-  }, [roadmapNodes]);
+  }, [roadmapNodes, user?.email]);
 
   // 3. Onboarding Role Setup (Step 1)
   const [onboardingRole, setOnboardingRole] = useState({
@@ -280,8 +138,14 @@ export const StartupProvider = ({ children }) => {
 
   // 6. Upgraded System States & History
   const [analysisHistory, setAnalysisHistory] = useState(() => {
-    const savedHistory = localStorage.getItem('startup_history');
-    return savedHistory ? JSON.parse(savedHistory) : [];
+    const savedUser = localStorage.getItem('startup_user') || localStorage.getItem('startupxpert_user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    if (parsedUser && parsedUser.email) {
+      migrateLegacyData(parsedUser.email);
+      const savedHistory = localStorage.getItem(`startup_history_${parsedUser.email}`);
+      return savedHistory ? JSON.parse(savedHistory) : [];
+    }
+    return [];
   });
 
   const [loadingState, setLoadingState] = useState(false);
@@ -291,45 +155,77 @@ export const StartupProvider = ({ children }) => {
 
   // Check draft presence on mount
   useEffect(() => {
-    const savedDraft = localStorage.getItem('startup_draft');
-    if (savedDraft) {
-      setResumeState(true);
+    const savedUser = localStorage.getItem('startup_user') || localStorage.getItem('startupxpert_user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    if (parsedUser && parsedUser.email) {
+      migrateLegacyData(parsedUser.email);
+      const savedDraft = localStorage.getItem(`startup_draft_${parsedUser.email}`);
+      if (savedDraft) {
+        setResumeState(true);
+      }
     }
   }, []);
 
+  // Synchronize user-specific state when user logs in/switches/logs out
+  useEffect(() => {
+    if (user && user.email) {
+      migrateLegacyData(user.email);
+
+      const savedHistory = localStorage.getItem(`startup_history_${user.email}`);
+      setAnalysisHistory(savedHistory ? JSON.parse(savedHistory) : []);
+
+      const savedRoadmap = localStorage.getItem(`startup_roadmap_${user.email}`);
+      setRoadmapNodes(savedRoadmap ? JSON.parse(savedRoadmap) : []);
+
+      const savedDraft = localStorage.getItem(`startup_draft_${user.email}`);
+      setResumeState(!!savedDraft);
+    } else {
+      setAnalysisHistory([]);
+      setRoadmapNodes([]);
+      setResumeState(false);
+    }
+  }, [user?.email]);
+
   // Synchronous State Commit
-  const loginUser = (email, password, name = 'Innovator') => {
-    const savedHistory = localStorage.getItem('startup_history');
+  const loginUser = (email, password, name = 'Innovator', supabaseUserId = null) => {
+    migrateLegacyData(email);
+    const savedHistory = localStorage.getItem(`startup_history_${email}`);
     const hasHistory = savedHistory ? JSON.parse(savedHistory).length > 0 : false;
-    
-    // Pehle se saved user data check karo (agar onboarding pehle complete ho chuki ho)
-    const prevSavedUser = localStorage.getItem('startup_user');
+
+    // Check if onboarding was previously completed for this email
+    const prevSavedUser = localStorage.getItem(`startup_user_${email}`) || localStorage.getItem('startup_user');
     const prevUser = prevSavedUser ? JSON.parse(prevSavedUser) : null;
-    const wasOnboardingCompleted = prevUser?.onboardingCompleted === true || hasHistory;
+    const wasOnboardingCompleted =
+      (prevUser && prevUser.email === email && prevUser.onboardingCompleted === true) ||
+      hasHistory;
 
     const activeUser = {
-      fullName: name,
-      email: email,
-      role: 'Founder',
-      avatarUrl: user.avatarUrl || '',
-      isNewUser: !hasHistory,              // new user agar koi history nahi
-      onboardingCompleted: wasOnboardingCompleted  // completed if analysis done ya pehle se completed
+      fullName:           name,
+      email:              email,
+      userId:             supabaseUserId || prevUser?.userId || null,  // store Supabase UUID
+      role:               'Founder',
+      avatarUrl:          prevUser?.avatarUrl || '',
+      isNewUser:          !wasOnboardingCompleted,
+      onboardingCompleted: wasOnboardingCompleted,
     };
     setUser(activeUser);
     setIsLoggedIn(true);
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('startup_user', JSON.stringify(activeUser));
     localStorage.setItem('startupxpert_user', JSON.stringify(activeUser));
+    localStorage.setItem(`startup_user_${email}`, JSON.stringify(activeUser));
   };
 
-  const registerUser = (fullName, email, role) => {
+  const registerUser = (fullName, email, role, supabaseUserId = null) => {
+    migrateLegacyData(email);
     const activeUser = {
       fullName,
       email,
+      userId:             supabaseUserId,   // store Supabase UUID from registration
       role,
-      avatarUrl: '',
-      isNewUser: true,
-      onboardingCompleted: false // naye user ko onboarding complete karni hai
+      avatarUrl:          '',
+      isNewUser:          true,
+      onboardingCompleted: false,           // new user must complete onboarding
     };
     setUser(activeUser);
     setIsLoggedIn(true);
@@ -337,12 +233,12 @@ export const StartupProvider = ({ children }) => {
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('startup_user', JSON.stringify(activeUser));
     localStorage.setItem('startupxpert_user', JSON.stringify(activeUser));
+    localStorage.setItem(`startup_user_${email}`, JSON.stringify(activeUser));
   };
 
 
   const logoutUser = () => {
     setIsLoggedIn(false);
-    setUser({ fullName: '', email: '', role: 'Founder', avatarUrl: '' });
 
     // Purge localStorage keys explicitly as requested
     localStorage.removeItem('isLoggedIn');
@@ -387,6 +283,10 @@ export const StartupProvider = ({ children }) => {
     });
     setAnalysisScores(null);
     setResumeState(false);
+    
+    // Set user to empty at the end to trigger sync and clean states
+    setUser({ fullName: '', email: '', role: 'Founder', avatarUrl: '' });
+    
     showToast('Logged out successfully.', 'info');
   };
 
@@ -493,16 +393,18 @@ export const StartupProvider = ({ children }) => {
 
   // Onboarding draft storage auto-saves
   const saveDraftSilent = (currentDetails) => {
+    if (!user?.email) return;
     const draftPayload = {
       onboardingRole,
       startupDetails: currentDetails,
       currentStep,
       timestamp: Date.now()
     };
-    localStorage.setItem('startup_draft', JSON.stringify(draftPayload));
+    localStorage.setItem(`startup_draft_${user.email}`, JSON.stringify(draftPayload));
   };
 
   const saveDraft = (stepIndex, activeDetails) => {
+    if (!user?.email) return;
     setLoadingState(true);
     setTimeout(() => {
       const draftPayload = {
@@ -511,7 +413,7 @@ export const StartupProvider = ({ children }) => {
         currentStep: stepIndex !== undefined ? stepIndex : currentStep,
         timestamp: Date.now()
       };
-      localStorage.setItem('startup_draft', JSON.stringify(draftPayload));
+      localStorage.setItem(`startup_draft_${user.email}`, JSON.stringify(draftPayload));
       setResumeState(true);
       setLoadingState(false);
       showToast('Startup draft auto-saved successfully!', 'success');
@@ -519,7 +421,8 @@ export const StartupProvider = ({ children }) => {
   };
 
   const restoreDraft = () => {
-    const savedDraft = localStorage.getItem('startup_draft');
+    if (!user?.email) return null;
+    const savedDraft = localStorage.getItem(`startup_draft_${user.email}`);
     if (savedDraft) {
       setLoadingState(true);
       const parsed = JSON.parse(savedDraft);
@@ -538,16 +441,19 @@ export const StartupProvider = ({ children }) => {
   };
 
   const clearDraft = () => {
-    localStorage.removeItem('startup_draft');
+    if (user?.email) {
+      localStorage.removeItem(`startup_draft_${user.email}`);
+    }
     setResumeState(false);
     setCurrentStep(0);
   };
 
   // History & score archiving operations
   const appendHistory = (entry) => {
+    if (!user?.email) return;
     const updated = [entry, ...analysisHistory];
     setAnalysisHistory(updated);
-    localStorage.setItem('startup_history', JSON.stringify(updated));
+    localStorage.setItem(`startup_history_${user.email}`, JSON.stringify(updated));
   };
 
   const saveAnalysis = (scoresToSave) => {
@@ -580,11 +486,14 @@ export const StartupProvider = ({ children }) => {
       appendHistory(newHistoryEntry);
       clearDraft();
 
-      // Update onboarding status to completed
+      // Update onboarding status to completed — preserve userId
       setUser(prev => {
-        const updated = { ...prev, onboardingCompleted: true };
+        const updated = { ...prev, onboardingCompleted: true, isNewUser: false };
         localStorage.setItem('startup_user', JSON.stringify(updated));
         localStorage.setItem('startupxpert_user', JSON.stringify(updated));
+        if (prev.email) {
+          localStorage.setItem(`startup_user_${prev.email}`, JSON.stringify(updated));
+        }
         return updated;
       });
 
@@ -595,6 +504,21 @@ export const StartupProvider = ({ children }) => {
 
   const updateRoadmapNode = (id, updatedFields) => {
     setRoadmapNodes(prev => prev.map(node => node.id === id ? { ...node, ...updatedFields } : node));
+
+    // Sync branch-level edits to Supabase if node has a DB id (branch-*)
+    // branchDbId is stored on the node when roadmap is built from backend
+    const node = roadmapNodes.find(n => n.id === id);
+    if (!node) return;
+
+    // Sync branch status/summary changes
+    if (node.branchDbId && (updatedFields.status !== undefined || updatedFields.summary !== undefined)) {
+      const fields = {};
+      if (updatedFields.status  !== undefined) fields.status  = updatedFields.status;
+      if (updatedFields.summary !== undefined) fields.summary = updatedFields.summary;
+      patchBranch(node.branchDbId, fields).catch(err =>
+        console.warn('[RoadmapSync] branch patch failed:', err.message)
+      );
+    }
   };
 
   const addRoadmapNode = (parentId, title, description) => {
@@ -647,9 +571,40 @@ export const StartupProvider = ({ children }) => {
           completed: false
         });
       } else if (action === 'toggle') {
-        updatedTasks = updatedTasks.map(t => t.id === taskPayload.id ? { ...t, completed: !t.completed } : t);
+        updatedTasks = updatedTasks.map(t => {
+          if (t.id !== taskPayload.id) return t;
+          const updated = { ...t, completed: !t.completed };
+          // Sync dep_status change to DB if task has a real DB id
+          if (t.dbTaskId) {
+            patchTask(t.dbTaskId, {
+              dep_status: updated.completed ? 'Ready' : (t.depStatus || 'Ready')
+            }).catch(err => console.warn('[RoadmapSync] task toggle failed:', err.message));
+          }
+          return updated;
+        });
       } else if (action === 'delete') {
         updatedTasks = updatedTasks.filter(t => t.id !== taskPayload.id);
+      } else if (action === 'updateField') {
+        // Used for inline field edits (priority, assigned_to, etc.)
+        updatedTasks = updatedTasks.map(t => {
+          if (t.id !== taskPayload.id) return t;
+          const updated = { ...t, ...taskPayload.fields };
+          if (t.dbTaskId && taskPayload.fields) {
+            // Map frontend field names to DB column names
+            const dbFields = {};
+            if (taskPayload.fields.priority    !== undefined) dbFields.priority    = taskPayload.fields.priority;
+            if (taskPayload.fields.assignedTo  !== undefined) dbFields.assigned_to = taskPayload.fields.assignedTo;
+            if (taskPayload.fields.depStatus   !== undefined) dbFields.dep_status  = taskPayload.fields.depStatus;
+            if (taskPayload.fields.complexity  !== undefined) dbFields.complexity  = taskPayload.fields.complexity;
+            if (taskPayload.fields.costImpact  !== undefined) dbFields.cost_impact = taskPayload.fields.costImpact;
+            if (Object.keys(dbFields).length > 0) {
+              patchTask(t.dbTaskId, dbFields).catch(err =>
+                console.warn('[RoadmapSync] task field update failed:', err.message)
+              );
+            }
+          }
+          return updated;
+        });
       }
       return { ...node, tasks: updatedTasks };
     }));
@@ -674,21 +629,23 @@ export const StartupProvider = ({ children }) => {
   };
 
   const deleteHistoryItem = (id) => {
+    if (!user?.email) return;
     setLoadingState(true);
     setTimeout(() => {
       const updated = analysisHistory.filter((item) => item.id !== id);
       setAnalysisHistory(updated);
-      localStorage.setItem('startup_history', JSON.stringify(updated));
+      localStorage.setItem(`startup_history_${user.email}`, JSON.stringify(updated));
       setLoadingState(false);
       showToast('Analysis entry deleted from history.', 'info');
     }, 600);
   };
 
   const clearHistory = () => {
+    if (!user?.email) return;
     setLoadingState(true);
     setTimeout(() => {
       setAnalysisHistory([]);
-      localStorage.removeItem('startup_history');
+      localStorage.removeItem(`startup_history_${user.email}`);
       setLoadingState(false);
       showToast('All analysis records cleared.', 'info');
     }, 800);
@@ -706,6 +663,7 @@ export const StartupProvider = ({ children }) => {
       const userId = await getCurrentUserId();
 
       const payload = {
+        user_id:                       userId || user?.userId || null,
         full_name:                     role.fullName         || '',
         age:                           parseInt(role.age)    || 0,
         gender:                        role.gender           || '',
@@ -732,13 +690,12 @@ export const StartupProvider = ({ children }) => {
         scalability_goal:              details.scalabilityGoal     || '',
         customer_acquisition_strategy: details.acquisitionStrategy || '',
         current_startup_stage:         details.startupStage        || '',
-        ...(userId && { user_id: userId }),
       };
 
       const result = await submitValidation(payload);
 
-      if (result?.session_id) {
-        localStorage.setItem('validation_session_id', result.session_id);
+      if (result?.session_id && user?.email) {
+        localStorage.setItem(`validation_session_id_${user.email}`, result.session_id);
       }
 
       const ap = result?.analysis_phase_state || {};
@@ -765,22 +722,36 @@ export const StartupProvider = ({ children }) => {
     }
   };
 
-  // Generate Roadmap from backend — only called when user explicitly requests it
+  // Generate Roadmap from backend — only allowed when a validated session exists
   const generateRoadmap = async (team = []) => {
-    const sessionId = localStorage.getItem('validation_session_id');
+    if (!user?.email) return null;
+
+    // Resolve session_id scoped to this user
+    let sessionId = localStorage.getItem(`validation_session_id_${user.email}`);
     if (!sessionId) {
-      showToast('Run validation first to generate a roadmap.', 'error');
+      // Legacy migration
+      const legacyId = localStorage.getItem('validation_session_id');
+      if (legacyId) {
+        localStorage.setItem(`validation_session_id_${user.email}`, legacyId);
+        sessionId = legacyId;
+      }
+    }
+    if (!sessionId) {
+      showToast('Validate your idea first before generating a roadmap.', 'error');
       return null;
     }
+
+    // Guard: idea must belong to this user — session_id is set only after successful
+    // validation which already stores the user_id. No extra check needed here since
+    // the session_id key is user-scoped in localStorage.
+
     setIsGeneratingRoadmap(true);
     try {
       const result = await submitRoadmap(sessionId, team);
       setRoadmapData(result);
-
-      // Convert backend branches+tasks into ReactFlow-compatible nodes
       const nodes = _buildRoadmapNodes(result);
       setRoadmapNodes(nodes);
-      localStorage.setItem('startup_roadmap', JSON.stringify(nodes));
+      localStorage.setItem(`startup_roadmap_${user.email}`, JSON.stringify(nodes));
       showToast('Roadmap generated successfully!', 'success');
       return result;
     } catch (err) {
@@ -793,46 +764,56 @@ export const StartupProvider = ({ children }) => {
 
   // Convert backend roadmap pipeline output → ReactFlow node tree format
   function _buildRoadmapNodes(result) {
-    const branches = result?.branches || [];
+    const branches    = result?.branch_roadmaps || result?.branches || [];
+    const syncedTasks = result?.synced_tasks    || [];
+
     const nodes = [
       {
-        id: 'root',
-        parentId: null,
-        title: result?.startup_name || startupDetails.startupName || 'Startup Launchpad',
-        description: `${result?.business_type || ''} — ${result?.reasoning || ''}`.trim(),
-        status: 'In Progress',
-        priority: 'High',
-        isExpanded: true,
-        tasks: [],
-        notes: [],
-        recommendations: result?.reasoning || ''
+        id:              'root',
+        parentId:        null,
+        branchDbId:      null,
+        title:           result?.startup_name || startupDetails.startupName || 'Startup Launchpad',
+        description:     `${result?.profiler_output?.business_type || ''} — ${result?.profiler_output?.reasoning || ''}`.trim(),
+        status:          'In Progress',
+        priority:        'High',
+        isExpanded:      true,
+        tasks:           [],
+        notes:           [],
+        recommendations: result?.profiler_output?.reasoning || '',
       }
     ];
 
     branches.forEach((branch) => {
-      const branchId = `branch-${branch.branch}`;
+      const branchId   = `branch-${branch.branch}`;
+      const branchTasks = syncedTasks.filter(t => t.branch === branch.branch);
+      const tasksToMap  = branchTasks.length > 0 ? branchTasks : (branch.tasks || []);
+
       nodes.push({
-        id: branchId,
-        parentId: 'root',
-        title: branch.branch.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-        description: branch.summary || '',
-        status: branch.status === 'success' ? 'In Progress' : 'Pending',
-        priority: 'Medium',
-        isExpanded: true,
-        tasks: (branch.tasks || []).map(t => ({
-          id:          `task-${t.task_id || Math.random().toString(36).slice(2)}`,
-          text:        `[${t.timeline || ''}] ${t.title}`.trim(),
-          completed:   false,
-          // rich backend fields
-          priority:    t.priority   || '',
-          assignedTo:  t.assigned_to || '',
-          depStatus:   t.dep_status || 'Ready',
-          description: t.description || '',
-          timeline:    t.timeline   || '',
-          blockedBy:   t.blocked_by || [],
+        id:              branchId,
+        parentId:        'root',
+        branchDbId:      branch.db_id || null,   // DB uuid from roadmap_branches
+        title:           branch.branch.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        description:     branch.summary || '',
+        status:          branch.status === 'success' ? 'In Progress' : 'Pending',
+        priority:        'Medium',
+        isExpanded:      true,
+        tasks: tasksToMap.map(t => ({
+          id:           t.task_id || `task-${Math.random().toString(36).slice(2)}`,
+          dbTaskId:     t.db_id   || null,         // DB uuid from roadmap_tasks
+          text:         `[${t.timeline || ''}] ${t.title}`.trim(),
+          completed:    false,
+          priority:     t.priority     || 'Medium',
+          assignedTo:   t.assigned_to  || 'Unassigned',
+          assigneeRole: t.assignee_role || '',
+          complexity:   t.complexity   || 'Low',
+          costImpact:   t.cost_impact  || 'None',
+          depStatus:    t.status       || 'Ready',
+          description:  t.description  || '',
+          timeline:     t.timeline     || '',
+          blockedBy:    t.blocked_by   || [],
         })),
-        notes: [],
-        recommendations: branch.summary || ''
+        notes:           [],
+        recommendations: branch.summary || '',
       });
     });
 

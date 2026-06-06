@@ -20,7 +20,11 @@ async def run_roadmap_pipeline(
     # ── Phase 0: fetch startup_input + validation context from DB ─
     raw = get_startup_input(session_id)
     if not raw:
-        raise ValueError(f"No startup_input found for session_id={session_id}")
+        raise ValueError(
+            f"startup_input row not found for session_id={session_id}. "
+            "Verify the session was created by the Validation module and that both modules "
+            "share the same Supabase project (check SUPABASE_URL in AI-VAL-MOD/.env)."
+        )
 
     startup_data = StartupInput(**{
         k: raw[k] for k in StartupInput.model_fields if k in raw
@@ -63,19 +67,16 @@ async def run_roadmap_pipeline(
     })
 
     # ── Assemble output + write to DB ──────────────────────────────
-    approved_set    = set(approved_branches)
+    approved_set     = set(approved_branches)
     branch_roadmaps: List[BranchRoadmap] = []
+    # Map branch name → DB id for task-level db_id lookup
+    branch_db_id_map: Dict[str, Optional[str]] = {}
 
     for r in final_state["branch_results"]:
         if r["branch"] not in approved_set:
             continue
 
-        branch_roadmaps.append(BranchRoadmap(
-            branch=  r["branch"],
-            status=  r["status"],
-            tasks=   r.get("tasks"),
-            summary= r.get("summary"),
-        ))
+        branch_db_id: Optional[str] = None
 
         if profiler_db_id:
             branch_db_id = write_branch(
@@ -91,6 +92,16 @@ async def run_roadmap_pipeline(
                     for i, t in enumerate(r["tasks"])
                 ])
 
+        branch_db_id_map[r["branch"]] = branch_db_id
+
+        branch_roadmaps.append(BranchRoadmap(
+            branch=  r["branch"],
+            status=  r["status"],
+            tasks=   r.get("tasks"),
+            summary= r.get("summary"),
+            db_id=   branch_db_id,   # DB uuid so frontend can sync branch edits
+        ))
+
     synced_tasks = [
         SyncedTask(
             task_id=         t["task_id"],
@@ -104,6 +115,7 @@ async def run_roadmap_pipeline(
             estimated_hours= t.get("estimated_hours"),
             complexity=      t.get("complexity"),
             cost_impact=     t.get("cost_impact"),
+            db_id=           None,   # synced_tasks come from graph state, no direct DB id here
             status=          t.get("status", "Ready"),
             blocked_by=      t.get("blocked_by", []),
             unblocks=        t.get("unblocks", []),

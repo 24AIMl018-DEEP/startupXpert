@@ -9,6 +9,8 @@
 create table public.startup_input (
   id                            uuid primary key default gen_random_uuid(),
   created_at                    timestamp default current_timestamp,
+  updated_at                    timestamp default current_timestamp,
+  user_id                       uuid references auth.users(id) on delete set null,
   full_name                     varchar,
   age                           int,
   gender                        varchar,
@@ -137,6 +139,7 @@ create table public.roadmap_profiler (
 create table public.roadmap_branches (
   id          uuid primary key default gen_random_uuid(),
   created_at  timestamptz default now(),
+  updated_at  timestamptz default now(),
   profiler_id uuid not null references public.roadmap_profiler(id) on delete cascade,
   session_id  uuid not null references public.startup_input(id) on delete cascade,
   branch      text,
@@ -147,6 +150,7 @@ create table public.roadmap_branches (
 create table public.roadmap_tasks (
   id              uuid primary key default gen_random_uuid(),
   created_at      timestamptz default now(),
+  updated_at      timestamptz default now(),
   branch_id       uuid not null references public.roadmap_branches(id) on delete cascade,
   task_id         text,
   title           text,
@@ -165,6 +169,7 @@ create table public.roadmap_tasks (
 
 -- Indexes
 create index on public.startup_input(startup_name);
+create index on public.startup_input(user_id);
 create index on public.pitch_phase(session_id);
 create index on public.query_phase(session_id);
 create index on public.query_agent_results(query_phase_id);

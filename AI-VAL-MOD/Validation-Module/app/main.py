@@ -66,6 +66,21 @@ async def validate(startup_data: StartupInput):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/v1/sessions/{user_id}")
+def get_user_sessions(user_id: str):
+    """Return all startup_input session IDs + metadata for a user."""
+    try:
+        from shared.db.supabase_client import get_supabase
+        res = get_supabase().table("startup_input") \
+            .select("id, created_at, startup_name, startup_domain, current_startup_stage") \
+            .eq("user_id", user_id) \
+            .order("created_at", desc=True) \
+            .execute()
+        return res.data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/v1/vector/search")
 def vector_search(query: str, top_k: int = 5, agent: str = None):
     return {"query": query, "results": vector_store.search(query=query, top_k=top_k, agent_filter=agent)}
