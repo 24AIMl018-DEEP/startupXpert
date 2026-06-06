@@ -44,7 +44,7 @@ def analysis_collector_node(state: GraphState) -> dict:
 
 def _build_graph():
     g = StateGraph(GraphState)
-    g.add_node("pitch",            pitch_node)
+    g.add_node("pitch_step",       pitch_node)   # renamed: "pitch" conflicts with GraphState.pitch key
     g.add_node("market",           market_node)
     g.add_node("competitor",       competitor_node)
     g.add_node("founder",          founder_node)
@@ -59,9 +59,9 @@ def _build_graph():
     g.add_node("risk_analysis",        risk_analysis_node)
     g.add_node("innovation_usp",       innovation_usp_node)
     g.add_node("analysis_collector",   analysis_collector_node)
-    g.set_entry_point("pitch")
+    g.set_entry_point("pitch_step")
     for n in QUERY_NODE_NAMES:
-        g.add_edge("pitch", n)
+        g.add_edge("pitch_step", n)
     for n in QUERY_NODE_NAMES:
         g.add_edge(n, "query_collector")
     for n in ANALYSIS_NODE_NAMES:
