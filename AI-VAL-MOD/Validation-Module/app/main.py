@@ -77,6 +77,22 @@ async def _validation_error(request: Request, exc: RequestValidationError):
     return JSONResponse(status_code=422, content={"status": "invalid_input", "errors": errors})
 
 
+@app.exception_handler(Exception)
+async def _global_error(request: Request, exc: Exception):
+    """Ensure CORS headers are present even on 500 errors."""
+    origin = request.headers.get("origin", "")
+    headers = {}
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    logger.exception(f"[API] Unhandled error: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc)},
+        headers=headers,
+    )
+
+
 @app.get("/health")
 def health():
     return {"status": "active"}
