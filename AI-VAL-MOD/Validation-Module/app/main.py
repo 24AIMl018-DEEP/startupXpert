@@ -31,11 +31,20 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # warm up sentence-transformer model at startup so first request is fast
-    logger.info("[Startup] Warming up vector store model...")
-    vector_store.add("warmup", {"agent": "warmup"})
-    vector_store.clear()
-    logger.info("[Startup] Model ready")
+    # Warm up sentence-transformer model in background — don't block startup
+    # The model downloads ~90MB on first run; healthcheck must pass before that completes
+    import asyncio
+    async def _warmup():
+        try:
+            logger.info("[Startup] Warming up vector store model (background)...")
+            await asyncio.get_event_loop().run_in_executor(None, lambda: (
+                vector_store.add("warmup", {"agent": "warmup"}),
+                vector_store.clear()
+            ))
+            logger.info("[Startup] Model ready")
+        except Exception as e:
+            logger.warning(f"[Startup] Model warmup failed (non-fatal): {e}")
+    asyncio.create_task(_warmup())
     yield
 
 
