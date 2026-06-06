@@ -39,10 +39,12 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="AI Startup Roadmap Generator", version="2.0.0")
 
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+_allow_credentials = "*" not in ALLOWED_ORIGINS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origin_regex=r".*" if "*" in ALLOWED_ORIGINS else None,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

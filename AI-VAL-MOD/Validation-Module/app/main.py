@@ -51,10 +51,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="AI Startup Validator", version="2.0.0", lifespan=lifespan)
 
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+# When ALLOWED_ORIGINS is wildcard, credentials must be disabled
+# (browsers block credentialed requests to wildcard origins)
+_allow_credentials = "*" not in ALLOWED_ORIGINS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origin_regex=r".*" if "*" in ALLOWED_ORIGINS else None,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
