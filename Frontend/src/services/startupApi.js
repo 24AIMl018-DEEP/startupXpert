@@ -80,6 +80,19 @@ export async function fetchValidatedSessions(userId) {
   return res.json();
 }
 
+// Get latest validated session from roadmap module DB
+export async function fetchLatestValidatedSession(userId) {
+  const headers = await getAuthHeaders();
+  try {
+    const res = await fetch(`${ROADMAP_URL}/api/v1/sessions/${userId}/latest`, { headers });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.found ? data.session : null;
+  } catch {
+    return null;
+  }
+}
+
 // Sync a branch edit to DB
 export async function patchBranch(branchId, fields) {
   const headers = await getAuthHeaders();

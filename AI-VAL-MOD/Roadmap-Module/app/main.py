@@ -23,6 +23,7 @@ from workflow.pipeline import run_roadmap_pipeline
 from services.db.reader import (
     get_sessions_by_user,
     get_validated_sessions_by_user,
+    get_latest_validated_session,
     get_roadmap_profiler,
     get_roadmap_branches,
     get_roadmap_tasks,
@@ -150,6 +151,16 @@ def get_user_sessions(user_id: str):
     """Return all startup_input sessions for a user, with validation status."""
     try:
         return get_validated_sessions_by_user(user_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/sessions/{user_id}/latest")
+def get_user_latest_session(user_id: str):
+    """Return the most recent completed validation session for a user."""
+    try:
+        session = get_latest_validated_session(user_id)
+        return {"found": session is not None, "session": session}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

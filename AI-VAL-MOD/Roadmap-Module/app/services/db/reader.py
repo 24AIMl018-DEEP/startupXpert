@@ -116,7 +116,6 @@ def get_sessions_by_user(user_id: str) -> List[Dict]:
 
 def get_validated_sessions_by_user(user_id: str) -> List[Dict]:
     """Fetch startup sessions that have completed validation (pipeline_output row exists)."""
-    # Fetch user sessions first, then cross-check pipeline_output
     sessions = get_sessions_by_user(user_id)
     if not sessions:
         return []
@@ -138,3 +137,28 @@ def get_validated_sessions_by_user(user_id: str) -> List[Dict]:
         s["is_validated"] = s["id"] in validated_ids
         result.append(s)
     return result
+
+
+def get_latest_validated_session(user_id: str) -> Optional[Dict]:
+    """Return the most recent session that has a completed pipeline_output."""
+    sessions = get_sessions_by_user(user_id)
+    if not sessions:
+        return None
+    session_ids = [s["id"] for s in sessions]
+    try:
+        res = _db().table("pipeline_output") \
+            .select("session_id, aggregate_validation_score, status, created_at") \
+            .in_("session_id", session_ids) \
+            .order("created_at", desc=True) \
+            .limit(1) \
+            .execute()
+        if not res.data:
+            return None
+        po = res.data[0]
+        session = next((s for s in sessions if s["id"] == po["session_id"]), None)
+        if not session:
+            return None
+        return {**session, "aggregate_validation_score": po.get("aggregate_validation_score"), "status": po.get("status")}
+    except Exception as e:
+        logger.error("[DBReader:latest_session] %s", e)
+        return None
