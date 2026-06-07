@@ -2,181 +2,180 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStartup } from '../context/StartupContext';
 import {
-  LayoutDashboard,
-  Briefcase,
-  Clock,
-  User,
-  Settings,
-  LogOut,
-  Sparkles,
-  ChevronRight,
-  Compass,
-  ChevronDown,
+  LayoutDashboard, Briefcase, Clock, Settings, LogOut,
+  Sparkles, Compass, User, Plus, ChevronDown,
+  PanelLeftClose, PanelLeftOpen
 } from 'lucide-react';
 
-const Sidebar = ({ activeTab, setActiveTab }) => {
+const NAV = [
+  { id: 'overview', label: 'Overview',    icon: LayoutDashboard, path: '/dashboard' },
+  { id: 'roadmap',  label: 'Roadmap',     icon: Compass,         path: '/roadmap'   },
+  { id: 'startups', label: 'My Startups', icon: Briefcase,       path: '/dashboard' },
+  { id: 'history',  label: 'History',     icon: Clock,           path: '/dashboard' },
+];
+
+const Sidebar = ({ activeTab, setActiveTab, collapsed, onToggle }) => {
   const { logoutUser, user, getInitials } = useStartup();
   const navigate = useNavigate();
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
-  const dropdownRef = useRef(null);
+  const dropRef = useRef(null);
 
-  // Close dropdown on outside click
   useEffect(() => {
-    const handler = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setProfileOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    const h = (e) => { if (dropRef.current && !dropRef.current.contains(e.target)) setProfileOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
   }, []);
 
-  const handleLogout = () => {
-    setProfileOpen(false);
-    logoutUser();
-    navigate('/');
+  const isActive = (item) => {
+    if (item.path === '/roadmap')   return location.pathname === '/roadmap';
+    if (item.path === '/settings')  return location.pathname === '/settings';
+    return location.pathname === '/dashboard' && activeTab === item.id;
   };
 
-  const navItems = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, path: '/dashboard' },
-    { id: 'roadmap', label: 'Roadmap', icon: Compass, path: '/roadmap' },
-    { id: 'startups', label: 'My Startups', icon: Briefcase, path: '/dashboard' },
-    { id: 'history', label: 'Analysis History', icon: Clock, path: '/dashboard' },
-    { id: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
-  ];
-
-  const getIsSelected = (item) => {
-    if (item.path === '/settings' && location.pathname === '/settings') return true;
-    if (item.path === '/roadmap' && location.pathname === '/roadmap') return true;
-    if (location.pathname === '/dashboard' && activeTab === item.id) return true;
-    return false;
+  const handleNav = (item) => {
+    if (item.path !== '/dashboard') { navigate(item.path); return; }
+    if (location.pathname === '/dashboard') setActiveTab?.(item.id);
+    else navigate('/dashboard', { state: { activeTab: item.id } });
   };
 
-  const handleNavClick = (item) => {
-    if (item.path === '/settings') {
-      navigate('/settings');
-    } else if (item.path === '/roadmap') {
-      navigate('/roadmap');
-    } else {
-      if (location.pathname === '/dashboard' && setActiveTab) {
-        setActiveTab(item.id);
-      } else {
-        navigate('/dashboard', { state: { activeTab: item.id } });
-      }
-    }
-  };
+  const Avatar = () => user.avatarUrl
+    ? <img src={user.avatarUrl} style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border2)', flexShrink: 0 }} alt="" />
+    : <div style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', color: 'var(--brand-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>{getInitials()}</div>;
+
+  const sidebarWidth = collapsed ? 56 : 224;
 
   return (
-    <aside className="w-72 border-r border-indigo-500/10 bg-[#0a0a0f]/95 flex flex-col justify-between p-5 shrink-0">
-      <div className="space-y-6">
-        {/* Brand */}
-        <div className="flex items-center justify-between px-1 pt-1">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-500/30 bg-indigo-500/10">
-              <Sparkles className="h-4 w-4 text-indigo-400" />
+    <aside className="sidebar" style={{ width: sidebarWidth, flexShrink: 0, display: 'flex', flexDirection: 'column', height: '100vh', position: 'sticky', top: 0, transition: 'width 0.2s ease', overflow: 'hidden' }}>
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', height: 52, padding: '0 12px', borderBottom: '1px solid var(--border)', flexShrink: 0, gap: 8 }}>
+        {!collapsed && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 }}>
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Sparkles size={12} style={{ color: 'var(--brand)' }} />
             </div>
-            <span className="text-base font-bold text-white tracking-tight">
-              Startup<span className="text-indigo-500">Xpert</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)', whiteSpace: 'nowrap' }}>
+              Startup<span style={{ color: 'var(--brand)' }}>Xpert</span>
             </span>
           </div>
-        </div>
-
-        {/* Navigation */}
-        <nav className="space-y-0.5">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isSelected = getIsSelected(item);
-            return (
-              <button
-                key={item.id}
-                onClick={() => handleNavClick(item)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group ${
-                  isSelected
-                    ? 'bg-indigo-600/12 border border-indigo-500/25 text-white'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Icon className={`h-4 w-4 transition-colors duration-200 ${isSelected ? 'text-indigo-400' : 'text-gray-500 group-hover:text-indigo-300'}`} />
-                  <span className="text-[13px]">{item.label}</span>
-                </div>
-                {isSelected && <ChevronRight className="h-3.5 w-3.5 text-indigo-400" />}
-              </button>
-            );
-          })}
-        </nav>
+        )}
+        <button onClick={onToggle} title={collapsed ? 'Expand' : 'Collapse'}
+          style={{ padding: 6, borderRadius: 6, background: 'transparent', border: 'none', color: 'var(--text3)', cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', transition: 'color 0.15s' }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--text1)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--text3)'}>
+          {collapsed ? <PanelLeftOpen size={14} /> : <PanelLeftClose size={14} />}
+        </button>
       </div>
 
-      {/* Profile section at bottom */}
-      <div className="border-t border-indigo-500/10 pt-4" ref={dropdownRef}>
-        <div className="relative">
-          <button
-            onClick={() => setProfileOpen(!profileOpen)}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-all duration-200 group"
-          >
-            {/* Avatar */}
-            {user.avatarUrl ? (
-              <img
-                src={user.avatarUrl}
-                alt={user.fullName}
-                className="h-8 w-8 rounded-full object-cover border border-indigo-500/30 shrink-0"
-              />
-            ) : (
-              <div className="h-8 w-8 rounded-full border border-indigo-500/25 bg-indigo-600/20 text-indigo-300 flex items-center justify-center text-xs font-bold shrink-0">
-                {getInitials()}
-              </div>
+      {/* New Validation CTA */}
+      <div style={{ padding: '10px 8px', display: 'flex', justifyContent: collapsed ? 'center' : 'stretch' }}>
+        <button onClick={() => navigate('/onboarding/role')} title={collapsed ? 'Validate New Idea' : undefined}
+          className="btn btn-primary btn-sm"
+          style={{ width: collapsed ? 34 : '100%', justifyContent: 'center', padding: collapsed ? '7px' : undefined }}>
+          <Plus size={13} />
+          {!collapsed && 'New Validation'}
+        </button>
+      </div>
+
+      {/* Workspace label */}
+      {!collapsed && (
+        <div style={{ padding: '4px 18px', fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)' }}>
+          Workspace
+        </div>
+      )}
+
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: '8px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {NAV.map(item => {
+          const Icon = item.icon;
+          const active = isActive(item);
+          return (
+            <button key={item.id} onClick={() => handleNav(item)} title={collapsed ? item.label : undefined}
+              style={{
+                display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10,
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                padding: collapsed ? '8px 0' : '7px 10px',
+                borderRadius: 7, cursor: 'pointer',
+                border: active ? 'none' : 'none',
+                borderLeft: active ? '2px solid var(--brand)' : '2px solid transparent',
+                background: active ? 'var(--brand-bg)' : 'transparent',
+                color: active ? 'var(--brand-light)' : 'var(--text2)',
+                fontSize: 13, fontWeight: active ? 600 : 500, transition: 'all 0.15s', width: '100%',
+              }}
+              onMouseEnter={e => { if (!active) { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.color = 'var(--text1)'; } }}
+              onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text2)'; } }}>
+              <Icon size={15} style={{ flexShrink: 0 }} />
+              {!collapsed && item.label}
+            </button>
+          );
+        })}
+
+        <div style={{ height: 1, background: 'var(--border)', margin: '4px 0' }} />
+
+        {/* Settings */}
+        <button onClick={() => navigate('/settings')} title={collapsed ? 'Settings' : undefined}
+          style={{
+            display: 'flex', alignItems: 'center', gap: collapsed ? 0 : 10,
+            justifyContent: collapsed ? 'center' : 'flex-start',
+            padding: collapsed ? '8px 0' : '7px 10px',
+            borderRadius: 7, cursor: 'pointer',
+            borderLeft: location.pathname === '/settings' ? '2px solid var(--brand)' : '2px solid transparent',
+            background: location.pathname === '/settings' ? 'var(--brand-bg)' : 'transparent',
+            color: location.pathname === '/settings' ? 'var(--brand-light)' : 'var(--text2)',
+            fontSize: 13, fontWeight: 500, transition: 'all 0.15s', width: '100%', border: 'none',
+          }}
+          onMouseEnter={e => { if (location.pathname !== '/settings') { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.color = 'var(--text1)'; } }}
+          onMouseLeave={e => { if (location.pathname !== '/settings') { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text2)'; } }}>
+          <Settings size={15} style={{ flexShrink: 0 }} />
+          {!collapsed && 'Settings'}
+        </button>
+      </nav>
+
+      {/* Profile footer */}
+      <div style={{ flexShrink: 0, padding: '8px', borderTop: '1px solid var(--border)' }} ref={dropRef}>
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setProfileOpen(v => !v)}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 8px', borderRadius: 7, cursor: 'pointer', width: '100%', border: 'none', background: 'transparent', transition: 'background 0.15s' }}
+            onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+            <Avatar />
+            {!collapsed && (
+              <>
+                <div style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.fullName || 'User'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email || ''}</div>
+                </div>
+                <ChevronDown size={12} style={{ color: 'var(--text3)', flexShrink: 0, transform: profileOpen ? 'rotate(180deg)' : 'rotate(0)', transition: 'transform 0.2s' }} />
+              </>
             )}
-
-            <div className="flex-1 text-left min-w-0">
-              <p className="text-[13px] font-semibold text-white truncate leading-tight">
-                {user.fullName || 'User'}
-              </p>
-              <p className="text-[11px] text-gray-500 truncate leading-tight">
-                {user.email || ''}
-              </p>
-            </div>
-
-            <ChevronDown className={`h-4 w-4 text-gray-500 shrink-0 transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`} />
           </button>
 
-          {/* Dropdown */}
           {profileOpen && (
-            <div className="absolute bottom-full left-0 right-0 mb-2 rounded-xl border border-indigo-500/15 bg-[#0e0e16] shadow-xl shadow-black/40 overflow-hidden animate-[fadeIn_0.15s_ease-out]">
-              {/* User info header */}
-              <div className="px-4 py-3 border-b border-indigo-500/10">
-                <p className="text-[12px] font-semibold text-white">{user.fullName || 'User'}</p>
-                <p className="text-[11px] text-gray-500 truncate">{user.email || ''}</p>
-                <span className="inline-block mt-1 rounded bg-indigo-950 border border-indigo-500/20 px-2 py-0.5 text-[10px] font-semibold text-indigo-300">
-                  {user.role || 'Founder'}
-                </span>
+            <div className="animate-fade-up" style={{ position: 'absolute', bottom: 'calc(100% + 4px)', left: 8, right: 8, background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 'var(--r-md)', boxShadow: 'var(--shadow-lg)', overflow: 'hidden', zIndex: 100 }}>
+              <div style={{ padding: '10px 12px 8px', borderBottom: '1px solid var(--border)' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)' }}>{user.fullName}</div>
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 1 }}>{user.email}</div>
               </div>
-
-              {/* Menu items */}
-              <div className="py-1.5">
-                <button
-                  onClick={() => { setProfileOpen(false); navigate('/profile'); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-gray-300 hover:text-white hover:bg-white/5 transition-all duration-150"
-                >
-                  <User className="h-4 w-4 text-gray-500" />
-                  View Profile
-                </button>
-                <button
-                  onClick={() => { setProfileOpen(false); navigate('/settings'); }}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-gray-300 hover:text-white hover:bg-white/5 transition-all duration-150"
-                >
-                  <Settings className="h-4 w-4 text-gray-500" />
-                  Settings
-                </button>
+              <div style={{ padding: '4px 0' }}>
+                {[
+                  { label: 'Profile',  icon: User,     action: () => navigate('/profile')  },
+                  { label: 'Settings', icon: Settings,  action: () => navigate('/settings') },
+                ].map(i => (
+                  <button key={i.label} onClick={() => { setProfileOpen(false); i.action(); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', background: 'transparent', border: 'none', color: 'var(--text2)', fontSize: 12, cursor: 'pointer', transition: 'all 0.1s' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface3)'; e.currentTarget.style.color = 'var(--text1)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text2)'; }}>
+                    <i.icon size={13} /> {i.label}
+                  </button>
+                ))}
               </div>
-
-              <div className="border-t border-indigo-500/10 py-1.5">
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-red-400 hover:text-red-300 hover:bg-red-500/8 transition-all duration-150"
-                >
-                  <LogOut className="h-4 w-4" />
-                  Log Out
+              <div style={{ padding: '4px 0', borderTop: '1px solid var(--border)' }}>
+                <button onClick={() => { setProfileOpen(false); logoutUser(); navigate('/'); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', background: 'transparent', border: 'none', color: 'var(--red)', fontSize: 12, cursor: 'pointer', transition: 'background 0.1s' }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--red-bg)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  <LogOut size={13} /> Sign Out
                 </button>
               </div>
             </div>

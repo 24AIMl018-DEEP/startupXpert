@@ -4,311 +4,227 @@ import { useStartup } from '../context/StartupContext';
 import Navbar from '../components/Navbar';
 import ProgressBar from '../components/ProgressBar';
 import InputField from '../components/InputField';
-import { ArrowRight, User, MapPin, Award, Users, CheckSquare } from 'lucide-react';
+import { ArrowRight, User, CheckSquare } from 'lucide-react';
+
+/* ─── Step progress indicator ── */
+const StepProgress = ({ current }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 24 }}>
+    {[
+      { n: 1, label: 'Profile' },
+      { n: 2, label: 'Details' },
+      { n: 3, label: 'Analysis' },
+    ].map(({ n, label }, i) => (
+      <React.Fragment key={n}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span className={n === current ? 'badge badge-brand' : 'badge badge-ghost'}
+            style={{ width: 22, height: 22, justifyContent: 'center', padding: 0, fontSize: 10 }}>
+            {n}
+          </span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: n === current ? 'var(--brand-light)' : 'var(--text3)' }}>{label}</span>
+        </div>
+        {i < 2 && <div style={{ flex: 1, height: 1, background: n < current ? 'var(--brand-border)' : 'var(--border)' }} />}
+      </React.Fragment>
+    ))}
+  </div>
+);
 
 const OnboardingRole = () => {
   const { onboardingRole, updateOnboardingRole } = useStartup();
   const navigate = useNavigate();
 
-  // Local Form state initialized from context
   const [formData, setFormData] = useState({
-    fullName: onboardingRole.fullName || '',
-    age: onboardingRole.age || '',
-    gender: onboardingRole.gender || '',
-    city: onboardingRole.city || '',
-    country: onboardingRole.country || '',
-    profession: onboardingRole.profession || '',
-    experience: onboardingRole.experience || '',
-    founderCount: onboardingRole.founderCount || '',
-    founderSkillset: onboardingRole.founderSkillset || [],
+    fullName:       onboardingRole.fullName       || '',
+    age:            onboardingRole.age            || '',
+    gender:         onboardingRole.gender         || '',
+    city:           onboardingRole.city           || '',
+    country:        onboardingRole.country        || '',
+    profession:     onboardingRole.profession     || '',
+    experience:     onboardingRole.experience     || '',
+    founderCount:   onboardingRole.founderCount   || '',
+    founderSkillset:onboardingRole.founderSkillset || [],
   });
 
   const [errors, setErrors] = useState({});
 
   const handleTextChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: '' }));
-    }
+    setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   const handlePillSelect = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors((prev) => ({ ...prev, [field]: '' }));
-    }
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
   const handleSkillToggle = (skill) => {
-    setFormData((prev) => {
+    setFormData(prev => {
       const skills = [...prev.founderSkillset];
       if (skills.includes(skill)) {
-        return { ...prev, founderSkillset: skills.filter((s) => s !== skill) };
-      } else {
-        return { ...prev, founderSkillset: [...skills, skill] };
+        return { ...prev, founderSkillset: skills.filter(s => s !== skill) };
       }
+      return { ...prev, founderSkillset: [...skills, skill] };
     });
-    if (errors.founderSkillset) {
-      setErrors((prev) => ({ ...prev, founderSkillset: '' }));
-    }
+    if (errors.founderSkillset) setErrors(prev => ({ ...prev, founderSkillset: '' }));
   };
 
   const validateForm = () => {
-    const newErrors = {};
-
-    if (!formData.fullName.trim()) newErrors.fullName = 'Full Name is required';
-    if (!formData.age.trim()) {
-      newErrors.age = 'Age is required';
-    } else if (isNaN(formData.age) || parseInt(formData.age) <= 0) {
-      newErrors.age = 'Please enter a valid age';
-    }
-    if (!formData.gender) newErrors.gender = 'Gender selection is required';
-    if (!formData.city.trim()) newErrors.city = 'City is required';
-    if (!formData.country.trim()) newErrors.country = 'Country is required';
-    if (!formData.profession) newErrors.profession = 'Profession is required';
-    if (!formData.experience) newErrors.experience = 'Experience level is required';
-    if (!formData.founderCount) newErrors.founderCount = 'Founder size is required';
-    if (formData.founderSkillset.length === 0) {
-      newErrors.founderSkillset = 'Select at least one founder skillset';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const e = {};
+    if (!formData.fullName.trim()) e.fullName = 'Full Name is required';
+    if (!formData.age.trim())      e.age = 'Age is required';
+    else if (isNaN(formData.age) || parseInt(formData.age) <= 0) e.age = 'Please enter a valid age';
+    if (!formData.gender)    e.gender    = 'Gender selection is required';
+    if (!formData.city.trim()) e.city    = 'City is required';
+    if (!formData.country.trim()) e.country = 'Country is required';
+    if (!formData.profession)  e.profession  = 'Profession is required';
+    if (!formData.experience)  e.experience  = 'Experience level is required';
+    if (!formData.founderCount) e.founderCount = 'Founder size is required';
+    if (formData.founderSkillset.length === 0) e.founderSkillset = 'Select at least one founder skillset';
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const handleNext = (e) => {
     e.preventDefault();
-    if (!validateForm()) {
-      // Scroll to top of form so they see the errors
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    // Save to context
+    if (!validateForm()) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     updateOnboardingRole(formData);
-    
-    // Navigate to step 2
     navigate('/onboarding/details');
   };
 
   return (
-    <div className="relative min-h-screen bg-[#0a0a0f] flex flex-col justify-between overflow-x-hidden">
+    <div style={{ background: 'var(--bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar />
 
-      <main className="flex-grow py-8 px-4 sm:px-6 lg:px-8 relative z-10 max-w-4xl mx-auto w-full">
-        {/* Progress Tracker */}
+      <main style={{ flex: 1, padding: '32px 16px', maxWidth: 760, margin: '0 auto', width: '100%' }}>
         <ProgressBar currentStep={1} />
 
-        <div className="rounded-2xl border border-indigo-500/10 bg-[#0e0e16]/80 p-8 shadow-[0_0_50px_rgba(0,0,0,0.5)] backdrop-blur-md space-y-8">
-          
+        {/* Step progress */}
+        <StepProgress current={1} />
+
+        <div className="glass-card animate-fade-up" style={{ padding: '32px' }}>
+
           {/* Header */}
-          <div className="text-left border-b border-indigo-500/5 pb-4">
-            <h2 className="font-heading text-2xl font-bold text-white flex items-center gap-2">
-              <User className="h-6 w-6 text-indigo-400" />
+          <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: 18, marginBottom: 28 }}>
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 22, fontWeight: 700, color: 'var(--text1)', margin: 0, marginBottom: 6 }}>
+              <User size={20} style={{ color: 'var(--brand-light)' }} />
               Founder Profile &amp; Role Setup
             </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Provide your background details so we can customize your analysis models
+            <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0, lineHeight: 1.6 }}>
+              Provide your background so we can customize your analysis models.
             </p>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleNext} className="space-y-6">
-            
-            {/* Demographics Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <InputField
-                label="Full Name"
-                type="text"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleTextChange}
-                placeholder="Bill Gates"
-                error={errors.fullName}
-                required
-              />
+          <form onSubmit={handleNext} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
-              <InputField
-                label="Age"
-                type="text"
-                name="age"
-                value={formData.age}
-                onChange={handleTextChange}
-                placeholder="28"
-                error={errors.age}
-                required
-              />
-
-              <InputField
-                label="Gender"
-                type="select"
-                name="gender"
-                value={formData.gender}
-                onChange={handleTextChange}
-                placeholder="Choose Gender"
-                options={[
-                  { value: 'Male', label: 'Male' },
-                  { value: 'Female', label: 'Female' },
-                  { value: 'Non-binary', label: 'Non-binary' },
-                  { value: 'Prefer not to say', label: 'Prefer not to say' },
-                ]}
-                error={errors.gender}
-                required
-              />
-            </div>
-
-            {/* Geography Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <InputField
-                label="City"
-                type="text"
-                name="city"
-                value={formData.city}
-                onChange={handleTextChange}
-                placeholder="Mumbai"
-                error={errors.city}
-                required
-              />
-
-              <InputField
-                label="Country"
-                type="text"
-                name="country"
-                value={formData.country}
-                onChange={handleTextChange}
-                placeholder="India"
-                error={errors.country}
-                required
-              />
-            </div>
-
-            {/* Profession Dropdown */}
-            <InputField
-              label="Profession"
-              type="select"
-              name="profession"
-              value={formData.profession}
-              onChange={handleTextChange}
-              placeholder="Choose Profession"
-              options={[
-                { value: 'Founder', label: 'Founder' },
-                { value: 'Student', label: 'Student' },
-                { value: 'Developer', label: 'Developer' },
-                { value: 'Business Analyst', label: 'Business Analyst' },
-                { value: 'Other', label: 'Other' },
-              ]}
-              error={errors.profession}
-              required
-            />
-
-            {/* Industry Experience Pills */}
-            <div className="space-y-2 text-left">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Industry Experience <span className="text-red-500">*</span>
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {['0-1 yrs', '1-3 yrs', '3-5 yrs', '5+ yrs'].map((exp) => {
-                  const isSelected = formData.experience === exp;
-                  return (
-                    <button
-                      key={exp}
-                      type="button"
-                      onClick={() => handlePillSelect('experience', exp)}
-                      className={`py-3.5 px-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-300 ${
-                        isSelected 
-                          ? 'bg-indigo-600 border-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)] scale-[1.02]' 
-                          : 'bg-[#0a0a0f] border-indigo-500/10 text-gray-400 hover:text-white hover:border-indigo-500/30'
-                      }`}
-                    >
-                      {exp}
-                    </button>
-                  );
-                })}
+            {/* Demographics */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
+              <div>
+                <InputField label="Full Name" type="text" name="fullName" value={formData.fullName} onChange={handleTextChange} placeholder="Bill Gates" error={errors.fullName} required />
+                <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>Your real name helps personalize analysis.</p>
               </div>
-              {errors.experience && (
-                <p className="text-xs font-medium text-red-400 mt-1">{errors.experience}</p>
-              )}
+              <div>
+                <InputField label="Age" type="text" name="age" value={formData.age} onChange={handleTextChange} placeholder="28" error={errors.age} required />
+                <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>Used for founder profile benchmarking.</p>
+              </div>
+              <div>
+                <InputField label="Gender" type="select" name="gender" value={formData.gender} onChange={handleTextChange} placeholder="Choose Gender" options={[
+                  { value: 'Male', label: 'Male' }, { value: 'Female', label: 'Female' },
+                  { value: 'Non-binary', label: 'Non-binary' }, { value: 'Prefer not to say', label: 'Prefer not to say' },
+                ]} error={errors.gender} required />
+              </div>
+            </div>
+
+            {/* Geography */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+              <div>
+                <InputField label="City" type="text" name="city" value={formData.city} onChange={handleTextChange} placeholder="Mumbai" error={errors.city} required />
+                <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>Your primary operating city.</p>
+              </div>
+              <div>
+                <InputField label="Country" type="text" name="country" value={formData.country} onChange={handleTextChange} placeholder="India" error={errors.country} required />
+                <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>Affects market and regulatory analysis.</p>
+              </div>
+            </div>
+
+            {/* Profession */}
+            <div>
+              <InputField label="Profession" type="select" name="profession" value={formData.profession} onChange={handleTextChange} placeholder="Choose Profession" options={[
+                { value: 'Founder', label: 'Founder' }, { value: 'Student', label: 'Student' },
+                { value: 'Developer', label: 'Developer' }, { value: 'Business Analyst', label: 'Business Analyst' },
+                { value: 'Other', label: 'Other' },
+              ]} error={errors.profession} required />
+              <p style={{ fontSize: 11, color: 'var(--text3)', marginTop: 3 }}>Helps tailor the analysis depth for your context.</p>
+            </div>
+
+            {/* Experience Pills */}
+            <div>
+              <label className="field-label">
+                Industry Experience <span style={{ color: 'var(--red)' }}>*</span>
+              </label>
+              <p style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 10 }}>How long have you been operating in this space?</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                {['0-1 yrs', '1-3 yrs', '3-5 yrs', '5+ yrs'].map(exp => (
+                  <button key={exp} type="button" onClick={() => handlePillSelect('experience', exp)}
+                    className={`pill${formData.experience === exp ? ' active' : ''}`}>
+                    {exp}
+                  </button>
+                ))}
+              </div>
+              {errors.experience && <p className="field-error">{errors.experience}</p>}
             </div>
 
             {/* Founder Count Pills */}
-            <div className="space-y-2 text-left">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Founder Count <span className="text-red-500">*</span>
+            <div>
+              <label className="field-label">
+                Founder Count <span style={{ color: 'var(--red)' }}>*</span>
               </label>
-              <div className="grid grid-cols-4 gap-3">
-                {['1', '2', '3', '4+'].map((count) => {
-                  const isSelected = formData.founderCount === count;
-                  return (
-                    <button
-                      key={count}
-                      type="button"
-                      onClick={() => handlePillSelect('founderCount', count)}
-                      className={`py-3.5 px-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-300 ${
-                        isSelected 
-                          ? 'bg-indigo-600 border-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)] scale-[1.02]' 
-                          : 'bg-[#0a0a0f] border-indigo-500/10 text-gray-400 hover:text-white hover:border-indigo-500/30'
-                      }`}
-                    >
-                      {count}
-                    </button>
-                  );
-                })}
+              <p style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 10 }}>How many co-founders are working on this venture?</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10 }}>
+                {['1', '2', '3', '4+'].map(count => (
+                  <button key={count} type="button" onClick={() => handlePillSelect('founderCount', count)}
+                    className={`pill${formData.founderCount === count ? ' active' : ''}`}>
+                    {count}
+                  </button>
+                ))}
               </div>
-              {errors.founderCount && (
-                <p className="text-xs font-medium text-red-400 mt-1">{errors.founderCount}</p>
-              )}
+              {errors.founderCount && <p className="field-error">{errors.founderCount}</p>}
             </div>
 
-            {/* Founder Skillset Checkboxes */}
-            <div className="space-y-2 text-left">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Founder Skillset (Select all that apply) <span className="text-red-500">*</span>
+            {/* Skillset Pills */}
+            <div>
+              <label className="field-label">
+                Founder Skillset <span style={{ color: 'var(--red)' }}>*</span>
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                {['Tech', 'Marketing', 'Finance', 'Design', 'Operations'].map((skill) => {
+              <p style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 10 }}>Select all core skills represented in your founding team.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
+                {['Tech', 'Marketing', 'Finance', 'Design', 'Operations'].map(skill => {
                   const isChecked = formData.founderSkillset.includes(skill);
                   return (
-                    <button
-                      key={skill}
-                      type="button"
-                      onClick={() => handleSkillToggle(skill)}
-                      className={`flex items-center justify-center gap-2 py-3.5 px-2 rounded-xl text-xs font-bold uppercase tracking-wider border transition-all duration-300 ${
-                        isChecked 
-                          ? 'bg-cyan-950 border-cyan-400/50 text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.15)] scale-[1.02]' 
-                          : 'bg-[#0a0a0f] border-indigo-500/10 text-gray-400 hover:text-white hover:border-indigo-500/30'
-                      }`}
-                    >
-                      <CheckSquare className={`h-4 w-4 transition-colors ${isChecked ? 'text-cyan-400' : 'text-gray-600'}`} />
+                    <button key={skill} type="button" onClick={() => handleSkillToggle(skill)}
+                      className={`pill${isChecked ? ' active-cyan' : ''}`}
+                      style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <CheckSquare size={14} style={{ color: isChecked ? 'var(--cyan)' : 'var(--text3)' }} />
                       {skill}
                     </button>
                   );
                 })}
               </div>
-              {errors.founderSkillset && (
-                <p className="text-xs font-medium text-red-400 mt-1 select-none animate-pulse">
-                  {errors.founderSkillset}
-                </p>
-              )}
+              {errors.founderSkillset && <p className="field-error">{errors.founderSkillset}</p>}
             </div>
 
-            {/* Submit Button */}
-            <div className="pt-4 border-t border-indigo-500/5 flex justify-end">
-              <button
-                type="submit"
-                className="group relative flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-bold text-white shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:bg-indigo-500 transition-all duration-300 hover:shadow-[0_0_30px_rgba(99,102,241,0.4)]"
-              >
+            {/* Submit */}
+            <div style={{ paddingTop: 12, borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="submit" className="btn btn-primary btn-lg">
                 Next Step: Startup Details
-                <ArrowRight className="h-4.5 w-4.5 transition-transform group-hover:translate-x-1" />
+                <ArrowRight size={16} />
               </button>
             </div>
-
           </form>
         </div>
       </main>
 
-      <footer className="border-t border-indigo-500/5 py-6 text-center text-xs text-gray-600 bg-[#08080c]/60">
-        &copy; {new Date().getFullYear()} StartupXpert. Step 1 of 3 Completed.
+      <footer style={{ borderTop: '1px solid var(--border)', padding: '20px', textAlign: 'center', fontSize: 12, color: 'var(--text3)', background: 'var(--bg-sub)' }}>
+        © {new Date().getFullYear()} StartupXpert — Step 1 of 3
       </footer>
     </div>
   );

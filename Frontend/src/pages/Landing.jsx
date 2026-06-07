@@ -1,33 +1,61 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { useStartup } from '../context/StartupContext';
 import { useToast } from '../context/ToastContext';
-import { 
-  ArrowRight, 
-  Lightbulb, 
-  Compass, 
-  FileText, 
-  Star, 
-  Sparkles, 
-  Activity, 
-  LineChart, 
-  ShieldCheck, 
-  Award,
-  Zap
+import {
+  ArrowRight,
+  Lightbulb,
+  Compass,
+  FileText,
+  Sparkles,
+  Activity,
+  Zap,
+  CheckCircle2,
+  Star,
+  Quote,
 } from 'lucide-react';
+
+/* ── Animated counter hook ── */
+const useCounter = (target, duration = 1800, start = false) => {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    if (!start) return;
+    let startTime = null;
+    const step = (timestamp) => {
+      if (!startTime) startTime = timestamp;
+      const progress = Math.min((timestamp - startTime) / duration, 1);
+      setCount(Math.floor(progress * target));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [target, duration, start]);
+  return count;
+};
 
 const Landing = () => {
   const navigate = useNavigate();
   const { showToast } = useToast();
   const { isLoggedIn } = useStartup();
+  const statsRef = useRef(null);
+  const [statsVisible, setStatsVisible] = useState(false);
 
-  // Redirect authenticated sessions immediately to Dashboard (Auth Flow Redirect)
+  const agents  = useCounter(50,  1600, statsVisible);
+  const vars    = useCounter(250, 1800, statsVisible);
+  const dims    = useCounter(5,   1200, statsVisible);
+
   useEffect(() => {
-    if (isLoggedIn) {
-      navigate('/dashboard', { replace: true });
-    }
+    if (isLoggedIn) navigate('/dashboard', { replace: true });
   }, [isLoggedIn, navigate]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) setStatsVisible(true); },
+      { threshold: 0.3 }
+    );
+    if (statsRef.current) observer.observe(statsRef.current);
+    return () => observer.disconnect();
+  }, []);
 
   const handleFooterLink = (path, e) => {
     e.preventDefault();
@@ -40,335 +68,352 @@ const Landing = () => {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#0a0a0f] flex flex-col justify-between overflow-x-hidden text-white font-sans transition-all duration-300">
-      
-      {/* Premium ambient light filters */}
-      <div className="absolute top-0 left-1/4 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-indigo-600/10 blur-[120px] pointer-events-none"></div>
-      <div className="absolute top-1/3 right-1/4 h-[500px] w-[500px] translate-x-1/2 rounded-full bg-cyan-500/5 blur-[120px] pointer-events-none"></div>
+    <div
+      style={{ background: 'var(--bg)', color: 'var(--text1)', minHeight: '100vh' }}
+      className="relative flex flex-col overflow-x-hidden"
+    >
+      {/* Ambient glows */}
+      <div className="glow-brand animate-pulse-soft" style={{ width: 600, height: 600, top: -100, left: '10%' }} />
+      <div className="glow-cyan-orb" style={{ width: 500, height: 500, top: '30%', right: '5%' }} />
+      <div className="glow-green-orb" style={{ width: 400, height: 400, bottom: '10%', left: '5%' }} />
 
       <Navbar />
 
-      {/* SECTION 1 — HERO REDESIGN */}
-      <main className="relative z-10 flex-grow flex flex-col items-center justify-center py-16 lg:py-28 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
-        
-        {/* Two-Column Premium Hero Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center w-full">
-          
-          {/* Left Column: Text & Badges */}
+      <main className="relative z-10 flex-grow flex flex-col items-center py-16 lg:py-24 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 gap-24">
+
+        {/* ── HERO ── */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center w-full animate-fade-up">
+
+          {/* Left: Text */}
           <div className="lg:col-span-7 text-left space-y-8 max-w-2xl mx-auto lg:mx-0">
-            
-            {/* Small Floating Badges Row */}
+
+            {/* Badges */}
             <div className="flex flex-wrap gap-2.5">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/30 bg-indigo-500/5 px-3.5 py-1 text-2xs font-bold uppercase tracking-wider text-indigo-300">
-                <Sparkles className="h-3 w-3 text-indigo-400" />
-                AI Validation
+              <span className="badge badge-brand">
+                <Sparkles className="h-3 w-3" /> AI Validation
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-cyan-500/5 px-3.5 py-1 text-2xs font-bold uppercase tracking-wider text-cyan-300">
-                <Activity className="h-3 w-3 text-cyan-400" />
-                Risk Analysis
+              <span className="badge badge-cyan">
+                <Activity className="h-3 w-3" /> Risk Analysis
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/5 px-3.5 py-1 text-2xs font-bold uppercase tracking-wider text-emerald-300">
-                <Zap className="h-3 w-3 text-emerald-400" />
-                Roadmap Generation
+              <span className="badge badge-ghost">
+                <Zap className="h-3 w-3" /> Roadmap Generation
               </span>
             </div>
 
             <div className="space-y-4">
-              <h1 className="font-heading text-4xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight text-white leading-[1.1]">
-                Validate. Plan. <br className="hidden sm:inline" />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-indigo-500 to-cyan-300 drop-shadow-[0_0_35px_rgba(99,102,241,0.3)]">
-                  Launch.
-                </span>
+              <h1 style={{ fontSize: 'clamp(2.5rem, 5vw, 4.5rem)', fontWeight: 900, lineHeight: 1.08, letterSpacing: '-0.03em', color: 'var(--text1)' }}>
+                Validate. Plan.<br className="hidden sm:inline" />
+                <span className="gradient-text"> Launch.</span>
               </h1>
-              <p className="text-sm sm:text-base leading-relaxed text-gray-400 max-w-xl">
-                AI-powered startup lifecycle platform helping founders validate, analyze and launch ideas faster. Stress-test your concept models against 250+ active market variables.
+              <p style={{ fontSize: '0.9375rem', lineHeight: 1.75, color: 'var(--text2)', maxWidth: 520 }}>
+                AI-powered startup lifecycle platform helping founders validate, analyze and launch ideas faster.
+                Stress-test your concept against 250+ active market variables.
               </p>
             </div>
 
-            {/* CTA buttons */}
+            {/* CTAs */}
             <div className="flex flex-col sm:flex-row items-center gap-4 pt-2">
-              <Link
-                to="/register"
-                className="group relative w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-8 py-4 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_30px_rgba(99,102,241,0.3)] hover:bg-indigo-500 hover:scale-[1.02] transition-all duration-300 focus:ring-2 focus:ring-indigo-500"
-              >
-                Get Started
-                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              <Link to="/register" className="btn btn-primary btn-lg w-full sm:w-auto">
+                Get Started <ArrowRight className="h-4 w-4" />
               </Link>
-              
-              <Link
-                to="/login"
-                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl border border-indigo-500/20 bg-[#0e0e16]/80 px-8 py-4 text-xs font-bold uppercase tracking-wider text-gray-300 hover:bg-indigo-500/10 hover:text-white transition-all duration-300 focus:ring-2 focus:ring-indigo-500"
-              >
-                Login
+              <Link to="/login" className="btn btn-outline btn-lg w-full sm:w-auto">
+                Sign In
               </Link>
             </div>
 
-            {/* Premium Startup Metric Chips */}
-            <div className="pt-8 border-t border-indigo-500/5 grid grid-cols-3 gap-4">
-              <div className="space-y-0.5">
-                <span className="text-xs text-gray-500 block font-semibold uppercase tracking-wider">Accuracy</span>
-                <span className="font-heading text-lg sm:text-xl font-black text-indigo-400 block">89% Prediction</span>
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-xs text-gray-500 block font-semibold uppercase tracking-wider">Volume</span>
-                <span className="font-heading text-lg sm:text-xl font-black text-cyan-400 block">1000+ Validated</span>
-              </div>
-              <div className="space-y-0.5">
-                <span className="text-xs text-gray-500 block font-semibold uppercase tracking-wider">Diversity</span>
-                <span className="font-heading text-lg sm:text-xl font-black text-emerald-400 block">50+ Domains</span>
-              </div>
+            {/* Metric chips */}
+            <div style={{ paddingTop: 24, borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+              {[
+                { label: 'Accuracy',  val: '89%',         sub: 'Prediction',  color: 'var(--brand-light)' },
+                { label: 'Volume',    val: '1000+',       sub: 'Validated',   color: 'var(--cyan)' },
+                { label: 'Diversity', val: '50+',         sub: 'Domains',     color: 'var(--green)' },
+              ].map(({ label, val, sub, color }) => (
+                <div key={label} className="space-y-0.5">
+                  <span style={{ fontSize: 10, color: 'var(--text3)', display: 'block', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
+                  <span style={{ fontSize: '1.1rem', fontWeight: 900, color, display: 'block', fontFamily: "'JetBrains Mono', monospace" }}>
+                    {val} <span style={{ fontSize: '0.75rem', color: 'var(--text2)', fontFamily: 'inherit' }}>{sub}</span>
+                  </span>
+                </div>
+              ))}
             </div>
-
           </div>
 
-          {/* Right Column: Premium Visual Showcase Card */}
+          {/* Right: Preview card */}
           <div className="lg:col-span-5 flex items-center justify-center">
-            
-            {/* Glassmorphism Floating Dashboard Card */}
-            <div className="relative w-full max-w-sm rounded-2xl border border-indigo-500/15 bg-indigo-950/20 p-6 shadow-2xl backdrop-blur-md animate-float overflow-hidden group hover:border-indigo-500/35 transition-all duration-500">
-              
-              {/* Background ambient pulse */}
-              <div className="absolute -right-24 -top-24 h-48 w-48 rounded-full bg-indigo-500/10 blur-2xl group-hover:bg-indigo-500/15 transition-all duration-500"></div>
+            <div className="glass-card animate-float" style={{ width: '100%', maxWidth: 360, padding: 24, position: 'relative', overflow: 'hidden' }}>
+              <div className="glow-brand" style={{ width: 200, height: 200, top: -60, right: -60, opacity: 0.6 }} />
 
-              {/* Console Mockup Header */}
-              <div className="flex items-center justify-between border-b border-indigo-500/10 pb-4 mb-4">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-rose-500/70"></span>
-                  <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/70"></span>
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/70"></span>
+              {/* Window chrome */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: 14, marginBottom: 18 }}>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  {['var(--red)', 'var(--amber)', 'var(--green)'].map((c, i) => (
+                    <span key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: c, opacity: 0.7 }} />
+                  ))}
                 </div>
-                <span className="text-[9px] font-bold font-mono tracking-widest text-indigo-400/80 uppercase">Venture Analyst v1.0</span>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--brand-light)', fontFamily: 'monospace' }}>
+                  Venture Analyst v1.0
+                </span>
               </div>
 
-              {/* Console Body Content */}
-              <div className="space-y-4 text-left">
-                
-                {/* Param 1: Market Demand */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-400 font-semibold uppercase tracking-wider text-[10px]">Market Demand Index</span>
-                    <span className="font-bold text-indigo-400">82% (Excellent)</span>
-                  </div>
-                  <div className="h-2 w-full bg-[#0a0a0f] border border-indigo-500/10 rounded-full overflow-hidden">
-                    <div className="h-full w-[82%] bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full shadow-[0_0_10px_rgba(99,102,241,0.5)]"></div>
-                  </div>
+              {/* Market Demand */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, fontWeight: 700, color: 'var(--text2)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>
+                  <span>Market Demand Index</span>
+                  <span style={{ color: 'var(--brand-light)' }}>82%</span>
                 </div>
-
-                {/* Grid for other stats */}
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  {/* Param 2: Risk */}
-                  <div className="p-3.5 rounded-xl border border-indigo-500/10 bg-[#0e0e16]/80 space-y-1 relative">
-                    <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider block">Risk Threat</span>
-                    <span className="text-xs font-bold text-amber-400 uppercase tracking-wide block flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-ping"></span>
-                      Medium
-                    </span>
-                  </div>
-
-                  {/* Param 3: Scalability */}
-                  <div className="p-3.5 rounded-xl border border-indigo-500/10 bg-[#0e0e16]/80 space-y-1">
-                    <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider block">Scalability</span>
-                    <span className="text-xs font-bold text-emerald-400 uppercase tracking-wide block">
-                      High Growth
-                    </span>
-                  </div>
+                <div className="progress-track" style={{ height: 6 }}>
+                  <div className="progress-fill" style={{ width: '82%', height: '100%' }} />
                 </div>
-
-                {/* Param 4: Revenue Potential */}
-                <div className="p-3.5 rounded-xl border border-indigo-500/10 bg-[#0e0e16]/80 space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Revenue Forecast</span>
-                    <span className="text-[10px] font-black text-cyan-400">High LTV</span>
-                  </div>
-                  <div className="flex items-end gap-1 h-6 pt-1">
-                    <div className="w-full h-[30%] bg-indigo-500/20 rounded-sm"></div>
-                    <div className="w-full h-[50%] bg-indigo-500/30 rounded-sm"></div>
-                    <div className="w-full h-[45%] bg-indigo-500/40 rounded-sm"></div>
-                    <div className="w-full h-[70%] bg-cyan-400/60 rounded-sm"></div>
-                    <div className="w-full h-[90%] bg-cyan-400 rounded-sm shadow-[0_0_8px_rgba(34,211,238,0.4)]"></div>
-                  </div>
-                </div>
-
               </div>
 
+              {/* Mini stats grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                <div style={{ padding: '10px 12px', borderRadius: 'var(--r)', border: '1px solid var(--border)', background: 'var(--surface2)' }}>
+                  <span style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Risk Threat</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--amber)', display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--amber)', display: 'inline-block' }} className="animate-pulse-soft" />
+                    Medium
+                  </span>
+                </div>
+                <div style={{ padding: '10px 12px', borderRadius: 'var(--r)', border: '1px solid var(--border)', background: 'var(--surface2)' }}>
+                  <span style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 4 }}>Scalability</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--green)' }}>High Growth</span>
+                </div>
+              </div>
+
+              {/* Revenue bars */}
+              <div style={{ padding: '10px 12px', borderRadius: 'var(--r)', border: '1px solid var(--border)', background: 'var(--surface2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                  <span>Revenue Forecast</span>
+                  <span style={{ color: 'var(--cyan)' }}>High LTV</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 3, height: 28 }}>
+                  {[30, 50, 45, 70, 90].map((h, i) => (
+                    <div key={i} style={{ flex: 1, height: `${h}%`, borderRadius: 3, background: i >= 3 ? 'var(--cyan)' : 'var(--brand-bg)', border: i >= 3 ? 'none' : '1px solid var(--brand-border)' }} />
+                  ))}
+                </div>
+              </div>
             </div>
+          </div>
+        </section>
 
+        {/* ── ANIMATED COUNTER STATS ── */}
+        <section ref={statsRef} className="w-full animate-fade-up delay-150">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+            {[
+              { value: agents,  suffix: '+', label: 'AI Agents',          sub: 'Specialized analysis models',  color: 'var(--brand-light)' },
+              { value: vars,    suffix: '+', label: 'Market Variables',    sub: 'Real-time data points tracked', color: 'var(--cyan)' },
+              { value: dims,    suffix: '',  label: 'Analysis Dimensions', sub: 'Deep validation layers',        color: 'var(--green)' },
+            ].map(({ value, suffix, label, sub, color }) => (
+              <div key={label} className="stat-card text-center">
+                <div style={{ fontSize: '2.5rem', fontWeight: 900, color, lineHeight: 1, fontFamily: "'JetBrains Mono', monospace", letterSpacing: '-0.04em', marginBottom: 6 }}>
+                  {value}{suffix}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text1)', marginBottom: 3 }}>{label}</div>
+                <div style={{ fontSize: 12, color: 'var(--text3)' }}>{sub}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── FEATURE CARDS ── */}
+        <section className="w-full max-w-5xl mx-auto animate-fade-up delay-225">
+          <div className="section-header text-center" style={{ marginBottom: 36 }}>
+            <div className="section-label" style={{ textAlign: 'center' }}>Platform Features</div>
+            <h2 className="section-title" style={{ fontSize: 28, textAlign: 'center' }}>Everything you need to launch</h2>
           </div>
 
-        </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+            {[
+              {
+                icon: Lightbulb,
+                title: 'Idea Validation',
+                desc: 'Analyze startup feasibility, problem-solution fit, and real market dynamics with 9 AI-scored dimensions.',
+                preview: { label: 'Confidence Index', value: '82% Market Match', color: 'var(--brand-light)' },
+                glow: 'glow-brand',
+              },
+              {
+                icon: Compass,
+                title: 'Roadmap Generator',
+                desc: 'Generate startup execution roadmaps, milestone maps, and project task lists assigned to your team.',
+                preview: { label: 'Phase 1', value: 'Validation → Launch', color: 'var(--cyan)' },
+                glow: 'glow-cyan-orb',
+              },
+              {
+                icon: FileText,
+                title: 'Documentation Suite',
+                desc: 'Compile professional pitch decks, financial summaries, and compliance filings automatically.',
+                preview: { label: 'Output Formats', value: 'PDF · Deck · Report', color: 'var(--text2)' },
+                glow: 'glow-green-orb',
+              },
+            ].map(({ icon: Icon, title, desc, preview, glow }) => (
+              <div key={title} className="glass-card" style={{ padding: 28, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className={glow} style={{ width: 160, height: 160, top: -40, right: -40 }} />
 
-        {/* SECTION 2 — HANDCRAFTED PREMIUM FEATURE CARDS */}
-        <section className="pt-8 w-full max-w-5xl mx-auto">
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-            
-            {/* CARD 1: Idea Validation */}
-            <div className="relative group flex flex-col justify-between p-7.5 rounded-2xl border border-indigo-500/10 bg-[#0e0e16]/60 backdrop-blur-md hover:-translate-y-1.5 hover:border-indigo-500/35 hover:bg-[#0e0e16]/90 hover:shadow-[0_0_35px_rgba(99,102,241,0.15)] transition-all duration-500 overflow-hidden text-left">
-              <div className="absolute -right-16 -top-16 h-32 w-32 rounded-full bg-indigo-500/5 blur-2xl group-hover:bg-indigo-500/10 transition-colors duration-500"></div>
-              
-              <div>
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/5 text-indigo-400 group-hover:border-cyan-400/40 group-hover:bg-cyan-500/5 group-hover:text-cyan-300 transition-all duration-500 group-hover:shadow-[0_0_15px_rgba(99,102,241,0.25)]">
-                  <Lightbulb className="h-5.5 w-5.5 transition-transform duration-500 group-hover:rotate-6" />
+                <div style={{ width: 44, height: 44, borderRadius: 'var(--r-md)', background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Icon size={20} style={{ color: 'var(--brand-light)' }} />
                 </div>
-                
-                <h3 className="font-heading text-lg font-bold text-white tracking-tight mb-2">
-                  Idea Validation
-                </h3>
-                
-                <p className="text-xs sm:text-sm leading-relaxed text-gray-400">
-                  Analyze startup feasibility, problem-solution fit, and real market dynamics.
-                </p>
-              </div>
 
-              {/* Card 1 Mini metric preview */}
-              <div className="mt-5 flex items-center justify-between p-3 rounded-xl border border-indigo-500/15 bg-indigo-950/20 backdrop-blur-sm">
-                <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">Confidence Index</span>
-                <span className="text-[10px] font-black text-indigo-400 font-mono">82% Market Match</span>
-              </div>
+                <div>
+                  <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text1)', marginBottom: 6 }}>{title}</h3>
+                  <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7 }}>{desc}</p>
+                </div>
 
-              <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-500 group-hover:w-full"></div>
+                <div style={{ marginTop: 'auto', padding: '10px 12px', borderRadius: 'var(--r)', border: '1px solid var(--border)', background: 'var(--surface2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: 9, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{preview.label}</span>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: preview.color, fontFamily: 'monospace' }}>{preview.value}</span>
+                </div>
+
+                {/* Bottom accent line */}
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, background: 'linear-gradient(90deg, var(--brand), var(--cyan))', opacity: 0, transition: 'opacity 0.3s' }}
+                  onMouseEnter={e => { (e.currentTarget).style.opacity = '1'; }}
+                  onMouseLeave={e => { (e.currentTarget).style.opacity = '0'; }} />
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── HOW IT WORKS ── */}
+        <section className="w-full max-w-4xl mx-auto animate-fade-up delay-300">
+          <div className="section-header text-center" style={{ marginBottom: 48 }}>
+            <div className="section-label" style={{ textAlign: 'center' }}>Process</div>
+            <h2 className="section-title" style={{ fontSize: 28, textAlign: 'center' }}>How it works</h2>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0, position: 'relative' }}>
+            {/* Connecting line */}
+            <div style={{ position: 'absolute', top: 28, left: '16.5%', right: '16.5%', height: 1, background: 'linear-gradient(90deg, var(--brand), var(--cyan))', opacity: 0.4, zIndex: 0 }} />
+
+            {[
+              { step: 1, title: 'Describe',  desc: 'Tell us about your startup idea — the problem, solution, audience, and market.' },
+              { step: 2, title: 'Validate',  desc: '5 specialized AI agents analyze 250+ data points across 9 key dimensions.' },
+              { step: 3, title: 'Launch',    desc: 'Get your score, roadmap, and actionable plan to take your idea to market.' },
+            ].map(({ step, title, desc }, idx) => (
+              <div key={step} style={{ textAlign: 'center', padding: '0 20px', position: 'relative', zIndex: 1 }}>
+                <div style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--brand-bg)', border: '2px solid var(--brand-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: 18, fontWeight: 900, color: 'var(--brand-light)', fontFamily: 'monospace', boxShadow: 'var(--shadow-brand)' }}>
+                  {step}
+                </div>
+                <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text1)', marginBottom: 8 }}>{title}</h3>
+                <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7 }}>{desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── TESTIMONIALS ── */}
+        <section className="w-full max-w-5xl mx-auto animate-fade-up delay-400">
+          <div className="section-header text-center" style={{ marginBottom: 36 }}>
+            <div className="section-label" style={{ textAlign: 'center' }}>Social Proof</div>
+            <h2 className="section-title" style={{ fontSize: 28, textAlign: 'center' }}>Trusted by founders</h2>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
+            {[
+              { name: 'Arjun Mehta',    role: 'Founder, TechBridge',       stars: 5, text: "StartupXpert gave me a reality check and a roadmap in one session. The AI analysis caught blindspots I'd missed for months." },
+              { name: 'Sara Collins',   role: 'CEO, NovaMed Health',        stars: 5, text: 'The depth of the market analysis blew me away. We used the validation report to close our seed round.' },
+              { name: 'Luis Fernandez', role: 'Co-founder, GreenLogistics', stars: 5, text: 'Exactly what early-stage founders need. Honest scores, clear risks, and an actionable execution plan.' },
+            ].map(({ name, role, stars, text }) => (
+              <div key={name} className="glass-card" style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <div style={{ display: 'flex', gap: 3 }}>
+                  {Array.from({ length: stars }).map((_, i) => (
+                    <Star key={i} size={13} style={{ color: 'var(--amber)', fill: 'var(--amber)' }} />
+                  ))}
+                </div>
+                <Quote size={18} style={{ color: 'var(--brand-border)', flexShrink: 0 }} />
+                <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.75, flex: 1, margin: 0 }}>{text}</p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'var(--brand-light)' }}>
+                    {name.split(' ').map(n => n[0]).join('')}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text1)' }}>{name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--text3)' }}>{role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── HERO CTA BANNER ── */}
+        <section className="w-full">
+          <div className="glass-card" style={{ padding: '48px 32px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
+            <div className="glow-brand animate-pulse-soft" style={{ width: 500, height: 300, top: '50%', left: '50%', transform: 'translate(-50%, -50%)' }} />
+            <div style={{ position: 'relative', zIndex: 1 }}>
+              <h2 style={{ fontSize: 28, fontWeight: 900, color: 'var(--text1)', marginBottom: 12, letterSpacing: '-0.02em' }}>
+                Ready to validate your idea?
+              </h2>
+              <p style={{ fontSize: 14, color: 'var(--text2)', marginBottom: 28, lineHeight: 1.7 }}>
+                Join thousands of founders using AI to make smarter decisions before they build.
+              </p>
+              <Link to="/register" className="btn btn-primary btn-xl">
+                Start for Free <ArrowRight size={16} />
+              </Link>
             </div>
-
-            {/* CARD 2: Roadmap Generator */}
-            <div className="relative group flex flex-col justify-between p-7.5 rounded-2xl border border-indigo-500/10 bg-[#0e0e16]/60 backdrop-blur-md hover:-translate-y-1.5 hover:border-indigo-500/35 hover:bg-[#0e0e16]/90 hover:shadow-[0_0_35px_rgba(99,102,241,0.15)] transition-all duration-500 overflow-hidden text-left">
-              <div className="absolute -right-16 -top-16 h-32 w-32 rounded-full bg-cyan-500/5 blur-2xl group-hover:bg-cyan-500/10 transition-colors duration-500"></div>
-              
-              <div>
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/5 text-indigo-400 group-hover:border-cyan-400/40 group-hover:bg-cyan-500/5 group-hover:text-cyan-300 transition-all duration-500 group-hover:shadow-[0_0_15px_rgba(99,102,241,0.25)]">
-                  <Compass className="h-5.5 w-5.5 transition-transform duration-500 group-hover:scale-110" />
-                </div>
-                
-                <h3 className="font-heading text-lg font-bold text-white tracking-tight mb-2">
-                  Roadmap Generator
-                </h3>
-                
-                <p className="text-xs sm:text-sm leading-relaxed text-gray-400">
-                  Generate startup execution roadmaps, milestone maps, and project tasks lists.
-                </p>
-              </div>
-
-              {/* Card 2 Timeline preview visual */}
-              <div className="mt-5 space-y-2 p-3 rounded-xl border border-indigo-500/15 bg-indigo-950/20 text-left">
-                <div className="flex items-center gap-2">
-                  <div className="h-2 w-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]"></div>
-                  <span className="text-[9px] text-gray-400 font-semibold truncate">Phase 1: Validation</span>
-                </div>
-                <div className="h-2 w-2 rounded-full bg-cyan-400 shadow-[0_0_8px_rgba(34,211,238,0.5)] ml-0"></div>
-              </div>
-
-              <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-500 group-hover:w-full"></div>
-            </div>
-
-            {/* CARD 3: Documentation Generator */}
-            <div className="relative group flex flex-col justify-between p-7.5 rounded-2xl border border-indigo-500/10 bg-[#0e0e16]/60 backdrop-blur-md hover:-translate-y-1.5 hover:border-indigo-500/35 hover:bg-[#0e0e16]/90 hover:shadow-[0_0_35px_rgba(99,102,241,0.15)] transition-all duration-500 overflow-hidden text-left">
-              <div className="absolute -right-16 -top-16 h-32 w-32 rounded-full bg-emerald-500/5 blur-2xl group-hover:bg-emerald-500/10 transition-colors duration-500"></div>
-              
-              <div>
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-indigo-500/20 bg-indigo-500/5 text-indigo-400 group-hover:border-cyan-400/40 group-hover:bg-cyan-500/5 group-hover:text-cyan-300 transition-all duration-500 group-hover:shadow-[0_0_15px_rgba(99,102,241,0.25)]">
-                  <FileText className="h-5.5 w-5.5 transition-transform duration-500 group-hover:scale-110" />
-                </div>
-                
-                <h3 className="font-heading text-lg font-bold text-white tracking-tight mb-2">
-                  Documentation Generator
-                </h3>
-                
-                <p className="text-xs sm:text-sm leading-relaxed text-gray-400">
-                  Compile professional pitch decks, financial summaries, and compliance filings.
-                </p>
-              </div>
-
-              {/* Card 3 Document stack preview */}
-              <div className="mt-5 flex items-center relative h-8 w-full overflow-hidden pl-2">
-                <div className="absolute left-0 bottom-0 h-6.5 w-16 rounded border border-indigo-500/10 bg-indigo-950/40 transform -rotate-6 z-0 shadow-md"></div>
-                <div className="absolute left-3 bottom-0 h-7 w-16 rounded border border-indigo-500/20 bg-indigo-900/40 transform -rotate-3 z-10 shadow-md"></div>
-                <div className="absolute left-6 bottom-0 h-7.5 w-18 rounded border border-indigo-500/30 bg-[#0e0e16] z-20 flex items-center justify-center shadow-lg">
-                  <span className="text-[7px] font-bold text-indigo-400 tracking-widest uppercase">Pitch Deck</span>
-                </div>
-              </div>
-
-              <div className="absolute bottom-0 left-0 h-[2px] w-0 bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-500 group-hover:w-full"></div>
-            </div>
-
           </div>
         </section>
 
       </main>
 
-      {/* SECTION 3 — PREMIUM FOOTER */}
-      <footer className="border-t border-indigo-500/5 py-12 bg-[#08080c]/60 relative z-10">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-8 text-sm">
-          
-          {/* Left Side: Brand Logo & Description */}
-          <div className="text-left space-y-2.5 max-w-xs flex flex-col">
-            <Link to="/" className="flex items-center gap-2 group">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-indigo-500/30 bg-indigo-500/10">
-                <Sparkles className="h-4 w-4 text-indigo-400" />
+      {/* ── FOOTER ── */}
+      <footer style={{ borderTop: '1px solid var(--border)', padding: '40px 0', background: 'var(--bg-sub)' }} className="relative z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-8">
+
+          {/* Brand */}
+          <div style={{ maxWidth: 280 }} className="space-y-2.5">
+            <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Sparkles size={13} style={{ color: 'var(--brand)' }} />
               </div>
-              <span className="font-heading text-base font-bold text-white">
-                Startup<span className="text-indigo-500">Xpert</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text1)' }}>
+                Startup<span style={{ color: 'var(--brand)' }}>Xpert</span>
               </span>
             </Link>
-            <p className="text-2xs leading-relaxed text-gray-500">
-              The AI-powered venture engine helping founders validate and launch ideas with data-driven feasibility scorecards.
+            <p style={{ fontSize: 11, color: 'var(--text3)', lineHeight: 1.6 }}>
+              AI-powered venture engine helping founders validate and launch ideas with data-driven feasibility scorecards.
             </p>
           </div>
 
-          {/* Center Column: Quick Navigation matrix */}
-          <nav className="flex flex-wrap justify-center gap-6 text-gray-500 text-xs uppercase tracking-wider font-semibold">
-            <Link to="/" className="hover:text-white transition-colors duration-300">
-              Home
-            </Link>
-            <a 
-              href="/dashboard" 
-              onClick={(e) => handleFooterLink('/dashboard', e)}
-              className="hover:text-white transition-colors duration-300"
-            >
-              Dashboard
-            </a>
-            <a 
-              href="/profile" 
-              onClick={(e) => handleFooterLink('/profile', e)}
-              className="hover:text-white transition-colors duration-300"
-            >
-              Profile
-            </a>
-            <a 
-              href="/settings" 
-              onClick={(e) => handleFooterLink('/settings', e)}
-              className="hover:text-white transition-colors duration-300"
-            >
-              Settings
-            </a>
+          {/* Nav */}
+          <nav style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 24 }}>
+            {[
+              { label: 'Home', path: '/' },
+              { label: 'Dashboard', path: '/dashboard', protected: true },
+              { label: 'Profile', path: '/profile', protected: true },
+              { label: 'Settings', path: '/settings', protected: true },
+            ].map(({ label, path, protected: prot }) => (
+              prot ? (
+                <a key={label} href={path} onClick={(e) => handleFooterLink(path, e)}
+                  style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em', transition: 'color 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--text1)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text3)'}>
+                  {label}
+                </a>
+              ) : (
+                <Link key={label} to={path}
+                  style={{ fontSize: 11, fontWeight: 600, color: 'var(--text3)', textTransform: 'uppercase', letterSpacing: '0.08em', transition: 'color 0.2s' }}
+                  onMouseEnter={e => e.currentTarget.style.color = 'var(--text1)'}
+                  onMouseLeave={e => e.currentTarget.style.color = 'var(--text3)'}>
+                  {label}
+                </Link>
+              )
+            ))}
           </nav>
 
-          {/* Right Column: Custom Inline SVGs & Version Tag */}
-          <div className="flex flex-col items-center md:items-end gap-3 text-gray-500 text-xs">
-            <div className="flex items-center gap-3">
-              <a href="#" className="hover:text-white transition-colors" aria-label="Twitter X link">
-                <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                </svg>
-              </a>
-              <a href="#" className="hover:text-white transition-colors" aria-label="LinkedIn link">
-                <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0z"/>
-                </svg>
-              </a>
-              <a href="#" className="hover:text-white transition-colors" aria-label="GitHub link">
-                <svg className="h-4 w-4 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
-                </svg>
-              </a>
+          {/* Copyright */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 3, alignItems: 'center' }}>
+              {[CheckCircle2, CheckCircle2, CheckCircle2].map((Icon, i) => (
+                <Icon key={i} size={13} style={{ color: 'var(--text3)' }} />
+              ))}
             </div>
-            
-            <div className="flex items-center gap-2 text-3xs font-bold text-gray-600 uppercase tracking-widest pt-1">
-              <span>&copy; {new Date().getFullYear()} StartupXpert</span>
-              <span>•</span>
-              <span className="rounded bg-indigo-950/40 border border-indigo-500/10 px-2 py-0.5 text-indigo-400">v1.0.0 Stable</span>
+            <div style={{ fontSize: 11, color: 'var(--text3)' }}>
+              © {new Date().getFullYear()} StartupXpert
+              <span className="badge badge-brand" style={{ marginLeft: 8, fontSize: 9 }}>v1.0.0</span>
             </div>
           </div>
         </div>
       </footer>
-
     </div>
   );
 };
