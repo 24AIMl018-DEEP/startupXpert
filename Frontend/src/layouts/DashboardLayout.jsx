@@ -1,72 +1,52 @@
 import React, { useState } from 'react';
 import Sidebar from '../components/Sidebar';
-import { Menu, X, Sparkles } from 'lucide-react';
+import { Menu, Sparkles } from 'lucide-react';
 
-export const DashboardLayout = ({ children, activeTab, setActiveTab }) => {
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+const DashboardLayout = ({ children, activeTab, setActiveTab }) => {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed,  setCollapsed]  = useState(false);
 
   return (
-    <div className="relative min-h-screen bg-[#0a0a0f] flex text-white overflow-hidden">
-      
-      {/* Desktop Sidebar (hidden on mobile, visible on lg screens) */}
-      <div className="hidden lg:flex shrink-0">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)', color: 'var(--text1)' }}>
+
+      {/* Ambient glows */}
+      <div className="glow-purple" style={{ position: 'fixed', top: '10%', left: '15%', width: 400, height: 400, zIndex: 0, pointerEvents: 'none' }} />
+      <div className="glow-green"  style={{ position: 'fixed', bottom: '20%', right: '10%', width: 350, height: 350, zIndex: 0, pointerEvents: 'none' }} />
+
+      {/* Desktop sidebar */}
+      <div className="hidden lg:flex" style={{ flexShrink: 0, position: 'relative', zIndex: 10 }}>
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab}
+          collapsed={collapsed} onToggle={() => setCollapsed(v => !v)} />
       </div>
 
-      {/* Mobile Sidebar Overlay Drawer (absolute positioning, z-50) */}
-      {isMobileSidebarOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          {/* Backdrop */}
-          <div 
-            onClick={() => setIsMobileSidebarOpen(false)}
-            className="fixed inset-0 bg-[#0a0a0f]/60 backdrop-blur-sm transition-opacity duration-300 animate-[fadeIn_0.2s_ease-out]"
-          ></div>
-          
-          {/* Sliding Sidebar Container */}
-          <div className="relative flex w-80 max-w-xs flex-col bg-[#0a0a0f] border-r border-indigo-500/10 animate-[slideInLeft_0.25s_ease-out]">
-            {/* Close button inside Sidebar Drawer */}
-            <div className="absolute right-4 top-4 z-10">
-              <button
-                onClick={() => setIsMobileSidebarOpen(false)}
-                className="h-8 w-8 flex items-center justify-center rounded-lg border border-indigo-500/10 bg-indigo-500/5 text-gray-400 hover:text-white"
-              >
-                <X className="h-4.5 w-4.5" />
-              </button>
-            </div>
-            
-            {/* Sidebar content */}
-            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex' }} className="lg:hidden">
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setMobileOpen(false)} />
+          <div style={{ position: 'relative', zIndex: 51 }} className="animate-slide-in-l">
+            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab}
+              collapsed={false} onToggle={() => setMobileOpen(false)} />
           </div>
         </div>
       )}
 
-      {/* Content wrapper */}
-      <div className="flex-grow flex flex-col min-h-screen overflow-hidden">
-        
-        {/* Mobile Header Top Bar (visible on mobile, hidden on lg screens) */}
-        <header className="flex lg:hidden items-center justify-between px-6 py-4 border-b border-indigo-500/5 bg-[#0a0a0f]/80 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setIsMobileSidebarOpen(true)}
-              className="p-2 rounded-lg border border-indigo-500/10 bg-indigo-500/5 text-indigo-400 hover:text-white hover:bg-indigo-500/10 transition-all focus:outline-none"
-              aria-label="Open navigation sidebar"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            
-            {/* Brand Logo in mobile header */}
-            <div className="flex items-center gap-1.5 ml-2">
-              <Sparkles className="h-4.5 w-4.5 text-indigo-400" />
-              <span className="font-heading text-base font-bold text-white">
-                Startup<span className="text-indigo-500">Xpert</span>
-              </span>
-            </div>
+      {/* Main content */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, position: 'relative', zIndex: 1 }}>
+        {/* Mobile header */}
+        <header className="flex lg:hidden" style={{ alignItems: 'center', gap: 12, padding: '0 16px', height: 52, borderBottom: '1px solid var(--border)', background: 'rgba(14,14,22,0.85)', backdropFilter: 'blur(20px)', flexShrink: 0 }}>
+          <button onClick={() => setMobileOpen(true)}
+            style={{ padding: 6, borderRadius: 6, background: 'var(--surface2)', border: '1px solid var(--border2)', color: 'var(--text2)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
+            <Menu size={15} />
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <Sparkles size={13} style={{ color: 'var(--brand)' }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text1)' }}>Startup<span style={{ color: 'var(--brand)' }}>Xpert</span></span>
           </div>
         </header>
 
-        {/* Main Content Area */}
-        <main className="flex-grow p-4 md:p-8 overflow-y-auto max-h-screen relative z-10">
-          <div className="max-w-6xl mx-auto space-y-6 md:space-y-8">
+        <main style={{ flex: 1, overflowY: 'auto', padding: '28px 32px' }}>
+          <div style={{ maxWidth: 1100, margin: '0 auto' }}>
             {children}
           </div>
         </main>
@@ -74,4 +54,5 @@ export const DashboardLayout = ({ children, activeTab, setActiveTab }) => {
     </div>
   );
 };
+
 export default DashboardLayout;

@@ -42,11 +42,13 @@ const ProtectedRoute = ({
     return <Navigate to="/onboarding/role" replace />;
   }
 
-  // Gate 3 — analysis result page requires scores to be present
-  if (requireAnalysis) {
-    const hasDetails = startupDetails?.startupName;
-    const hasScores  = !!analysisScores;
-    if (!hasDetails || !hasScores) {
+  // Gate 3 — analysis result page: redirect to validate only if truly no data at all
+  if (requireAnalysis && !analysisScores) {
+    // Check sessionStorage directly in case context hasn't rehydrated yet
+    try {
+      const cached = sessionStorage.getItem('analysis_scores');
+      if (!cached) return <Navigate to="/startup/validate" replace />;
+    } catch {
       return <Navigate to="/startup/validate" replace />;
     }
   }

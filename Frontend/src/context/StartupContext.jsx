@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { useToast } from './ToastContext';
 import { submitValidation, submitRoadmap, patchBranch, patchTask } from '../services/startupApi';
 import { getCurrentUserId } from '../services/authService';
@@ -63,9 +63,13 @@ export const StartupProvider = ({ children }) => {
     };
   });
 
-  // Roadmap State — always fetched from DB, never localStorage
-  const [roadmapNodes, setRoadmapNodes] = useState([]);
-  const [roadmapData, setRoadmapData]   = useState(null);
+  // Roadmap State — persisted to sessionStorage so refresh doesn't blank the page
+  const [roadmapNodes, setRoadmapNodes] = useState(() => {
+    try { const s = sessionStorage.getItem('roadmap_nodes'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const [roadmapData, setRoadmapData] = useState(() => {
+    try { const s = sessionStorage.getItem('roadmap_data'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
 
   // 3. Onboarding Role Setup (Step 1)
@@ -102,9 +106,13 @@ export const StartupProvider = ({ children }) => {
     startupStage: '',
   });
 
-  // 5. Analysis Scores (Step 3)
-  const [analysisScores, setAnalysisScores] = useState(null);
-  const [fullAnalysisData, setFullAnalysisData] = useState(null); // complete backend response
+  // 5. Analysis Scores (Step 3) — persisted to sessionStorage
+  const [analysisScores, setAnalysisScores] = useState(() => {
+    try { const s = sessionStorage.getItem('analysis_scores'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const [fullAnalysisData, setFullAnalysisData] = useState(() => {
+    try { const s = sessionStorage.getItem('full_analysis_data'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // 6. History — loaded from DB after login, never from localStorage
@@ -125,20 +133,30 @@ export const StartupProvider = ({ children }) => {
     }
   }, []);
 
-  // When user changes — reset state (DB will reload as needed)
+  // When user changes — only reset when it's a genuine user switch (not initial load)
+  const prevEmailRef = useRef(null);
   useEffect(() => {
+    const prevEmail = prevEmailRef.current;
+    prevEmailRef.current = user?.email || null;
+
+    // Skip on initial mount (prevEmail is null) — sessionStorage already has the data
+    if (prevEmail === null) return;
+
     if (user?.email) {
-      // Only draft check from localStorage — everything else from DB
       const savedDraft = localStorage.getItem(`startup_draft_${user.email}`);
       setResumeState(!!savedDraft);
-      // Reset roadmap/history — will be loaded from DB on demand
-      setRoadmapNodes([]);
-      setRoadmapData(null);
-      setAnalysisHistory([]);
+      // Only clear roadmap/history if the user actually switched accounts
+      if (prevEmail && prevEmail !== user.email) {
+        setRoadmapNodes([]);
+        setRoadmapData(null);
+        setAnalysisHistory([]);
+        try { sessionStorage.clear(); } catch {}
+      }
     } else {
       setAnalysisHistory([]);
       setRoadmapNodes([]);
       setResumeState(false);
+      try { sessionStorage.clear(); } catch {}
     }
   }, [user?.email]);
 
@@ -193,7 +211,14 @@ export const StartupProvider = ({ children }) => {
     setRoadmapNodes([]);
     setRoadmapData(null);
     setAnalysisScores(null);
+    setFullAnalysisData(null);
     setAnalysisHistory([]);
+    try {
+      sessionStorage.removeItem('analysis_scores');
+      sessionStorage.removeItem('full_analysis_data');
+      sessionStorage.removeItem('roadmap_nodes');
+      sessionStorage.removeItem('roadmap_data');
+    } catch {}
     setResumeState(false);
     setOnboardingRole({ fullName: '', age: '', gender: '', city: '', country: '', profession: '', experience: '', founderCount: '', founderSkillset: [] });
     setStartupDetails({ startupName: '', startupDomain: '', problemStatement: '', startupDescription: '', targetAudience: '', geographicMarket: '', existingCompetitors: '', revenueModel: '', estimatedPricing: '', availableFunding: '', monthlyBurnCapacity: '', platformType: [], techComplexity: '', mvpTimeline: '', scalabilityGoal: '', acquisitionStrategy: '', startupStage: '' });
@@ -408,7 +433,11 @@ export const StartupProvider = ({ children }) => {
   };
 
   const updateRoadmapNode = (id, updatedFields) => {
-    setRoadmapNodes(prev => prev.map(node => node.id === id ? { ...node, ...updatedFields } : node));
+    setRoadmapNodes(prev => {
+      const updated = prev.map(node => node.id === id ? { ...node, ...updatedFields } : node);
+      try { sessionStorage.setItem('roadmap_nodes', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
 
     // Sync branch-level edits to Supabase if node has a DB id (branch-*)
     // branchDbId is stored on the node when roadmap is built from backend
@@ -622,6 +651,10 @@ export const StartupProvider = ({ children }) => {
 
       setAnalysisScores(scores);
       setFullAnalysisData(result);
+      try {
+        sessionStorage.setItem('analysis_scores', JSON.stringify(scores));
+        sessionStorage.setItem('full_analysis_data', JSON.stringify(result));
+      } catch {}
       return scores;
     } catch (err) {
       // Re-throw so AnalysisLoader can catch and show error UI
@@ -660,9 +693,13 @@ export const StartupProvider = ({ children }) => {
       }
 
       const result = await submitRoadmap(sessionId, team);
-      setRoadmapData(result);
       const nodes = _buildRoadmapNodes(result);
+      setRoadmapData(result);
       setRoadmapNodes(nodes);
+      try {
+        sessionStorage.setItem('roadmap_data', JSON.stringify(result));
+        sessionStorage.setItem('roadmap_nodes', JSON.stringify(nodes));
+      } catch {}
       showToast('Roadmap generated successfully!', 'success');
       return result;
     } catch (err) {
@@ -739,10 +776,12 @@ export const StartupProvider = ({ children }) => {
   }
 
   const dashboardStats = {
-    totalStartups: analysisHistory.length,
-    completedAnalysis: analysisHistory.filter((h) => h.scores).length,
-    savedDraftCount: resumeState ? 1 : 0,
-    roadmapProgress: analysisHistory.length > 0 ? '4 / 10' : '0 / 10',
+    totalStartups:     analysisHistory.length,
+    completedAnalysis: analysisHistory.filter(h => h.isValidated || h.scores).length,
+    savedDraftCount:   resumeState ? 1 : 0,
+    roadmapProgress:   roadmapNodes.filter(n => n.parentId === 'root').length > 0
+      ? `${roadmapNodes.filter(n => n.tasks?.some(t => t.completed)).length} / ${roadmapNodes.filter(n => n.parentId === 'root').length}`
+      : '0 / 0',
   };
 
   // Helper: Get Name Initials
