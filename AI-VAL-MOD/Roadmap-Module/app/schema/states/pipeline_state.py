@@ -6,8 +6,8 @@ class ProfilerOutput(BaseModel):
     business_type: str
     tech_required: bool
     prioritized_branches: List[str]
-    banned_branches: List[str]
-    reasoning: str
+    banned_branches: List[str] = []
+    reasoning: str = ""
 
 
 class TeamMember(BaseModel):

@@ -32,6 +32,10 @@ class ProfilerAgent(BaseAgent):
 
         # Normalise output — extract branch names list + outlines dict
         branches: List[Dict] = result.get("branches", [])
+        if not isinstance(branches, list):
+            branches = []
+        # Guard: each branch must be a dict with a "name" key
+        branches = [b for b in branches if isinstance(b, dict) and b.get("name")]
         result["prioritized_branches"] = [b["name"] for b in branches]
         result["branch_outlines"]      = {b["name"]: b.get("outline", "") for b in branches}
         result["branch_tier_map"]      = result.get("branch_tier_map") or {

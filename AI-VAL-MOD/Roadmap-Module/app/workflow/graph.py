@@ -29,10 +29,15 @@ def build_graph(branches: List[str]) -> StateGraph:
         g.add_node(f"branch_{branch}", make_branch_node(branch))
 
     g.set_entry_point("profiler")
-    for branch in branches:
-        g.add_edge("profiler", f"branch_{branch}")
-    for branch in branches:
-        g.add_edge(f"branch_{branch}", "collector")
+
+    if branches:
+        for branch in branches:
+            g.add_edge("profiler", f"branch_{branch}")
+        for branch in branches:
+            g.add_edge(f"branch_{branch}", "collector")
+    else:
+        # No branches approved — go straight to collector
+        g.add_edge("profiler", "collector")
 
     g.add_edge("collector", "resource")
     g.add_edge("resource",  "sync")
