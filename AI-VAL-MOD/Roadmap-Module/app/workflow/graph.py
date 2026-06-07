@@ -10,7 +10,7 @@ from workflow.nodes.sync_node import sync_node
 
 def _collector_node(state: dict) -> dict:
     print(f"[Node:collector] {len(state.get('branch_results', []))} branches collected")
-    return {}
+    return {"branch_results": state.get("branch_results", [])}
 
 
 def build_graph(branches: List[str]) -> StateGraph:
