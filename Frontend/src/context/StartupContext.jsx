@@ -594,7 +594,20 @@ export const StartupProvider = ({ children }) => {
       };
 
       const result = await submitValidation(payload);
-      // session_id is stored in DB — no localStorage write needed
+
+      // Save session_id to Supabase profiles so it persists across sessions
+      if (result?.session_id && userId) {
+        try {
+          const { supabase } = await import('../services/supabase');
+          await supabase.from('profiles').upsert({
+            id: userId,
+            last_session_id:   result.session_id,
+            last_startup_name: details.startupName || '',
+          }, { onConflict: 'id' });
+        } catch (e) {
+          console.warn('[Profile] session_id save failed:', e.message);
+        }
+      }
 
       const ap = result?.analysis_phase_state || {};
       const scores = {
@@ -628,23 +641,23 @@ export const StartupProvider = ({ children }) => {
     try {
       let sessionId = null;
 
-      // Step 1: Try to get the latest validated session from DB using user's Supabase UUID
+      // Get latest validated session from VALIDATION service (always up)
+      // Do NOT use Roadmap service here — it may be down
       if (user?.userId) {
         try {
-          const { fetchLatestValidatedSession } = await import('../services/startupApi');
-          const latest = await fetchLatestValidatedSession(user.userId);
-          if (latest?.id) {
-            sessionId = latest.id;
-            console.log(`[Roadmap] Using latest DB session: ${sessionId} (${latest.startup_name})`);
+          const { checkUserHasValidation } = await import('../services/startupApi');
+          const { hasValidation, sessionId: sid } = await checkUserHasValidation(user.userId);
+          if (hasValidation && sid) {
+            sessionId = sid;
+            console.log(`[Roadmap] Using session from Validation DB: ${sessionId}`);
           }
         } catch (e) {
-          console.warn('[Roadmap] DB session fetch failed, falling back to localStorage:', e.message);
+          console.warn('[Roadmap] Validation DB check failed:', e.message);
         }
       }
 
-      // Step 2: Fall back — if DB unavailable, show error (no localStorage fallback for logic)
       if (!sessionId) {
-        showToast('Could not find your validation session. Please validate your idea first.', 'error');
+        showToast('No validated session found. Please validate your idea first.', 'error');
         return null;
       }
 
@@ -652,7 +665,6 @@ export const StartupProvider = ({ children }) => {
       setRoadmapData(result);
       const nodes = _buildRoadmapNodes(result);
       setRoadmapNodes(nodes);
-      // Do NOT write to localStorage — roadmap lives in DB
       showToast('Roadmap generated successfully!', 'success');
       return result;
     } catch (err) {

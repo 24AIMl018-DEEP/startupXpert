@@ -1,9 +1,9 @@
 [build]
 builder = "dockerfile"
-dockerfilePath = "AI-VAL-MOD/Dockerfile.validation"
+dockerfilePath = "AI-VAL-MOD/Dockerfile.roadmap"
 
 [deploy]
 healthcheckPath = "/health"
-healthcheckTimeout = 300
+healthcheckTimeout = 120
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3

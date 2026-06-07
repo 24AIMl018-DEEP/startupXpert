@@ -35,15 +35,35 @@ export async function checkUserHasValidation(userId) {
   if (!userId) return { hasValidation: false, sessionId: null, startupName: null };
   const headers = await getAuthHeaders();
   try {
+    // Primary: check validation module's /latest endpoint
     const res = await fetch(`${VALIDATION_URL}/api/v1/sessions/${userId}/latest`, { headers });
-    if (!res.ok) return { hasValidation: false, sessionId: null, startupName: null };
-    const data = await res.json();
-    return {
-      hasValidation: data.found === true,
-      sessionId:     data.session?.id || null,
-      startupName:   data.session?.startup_name || null,
-      score:         data.session?.aggregate_validation_score || null,
-    };
+    if (res.ok) {
+      const data = await res.json();
+      if (data.found) {
+        return {
+          hasValidation: true,
+          sessionId:     data.session?.id || null,
+          startupName:   data.session?.startup_name || null,
+          score:         data.session?.aggregate_validation_score || null,
+        };
+      }
+    }
+    // Fallback: check profiles.last_session_id in Supabase directly
+    const { supabase } = await import('./supabase');
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('last_session_id, last_startup_name')
+      .eq('id', userId)
+      .single();
+    if (profile?.last_session_id) {
+      return {
+        hasValidation: true,
+        sessionId:     profile.last_session_id,
+        startupName:   profile.last_startup_name || null,
+        score:         null,
+      };
+    }
+    return { hasValidation: false, sessionId: null, startupName: null };
   } catch {
     return { hasValidation: false, sessionId: null, startupName: null };
   }
