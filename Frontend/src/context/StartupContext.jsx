@@ -534,10 +534,16 @@ export const StartupProvider = ({ children }) => {
     const role    = onboardingRoleArg  || onboardingRole;
 
     try {
-      const userId = await getCurrentUserId();
+      // Use stored userId from context first (already verified at login)
+      // getCurrentUserId() is async and may return null if session not yet restored
+      const userId = user?.userId || await getCurrentUserId();
+      
+      if (!userId) {
+        throw new Error('User not authenticated. Please log in again before validating.');
+      }
 
       const payload = {
-        user_id:                       userId || user?.userId || null,
+        user_id:                       userId,
         full_name:                     role.fullName         || '',
         age:                           parseInt(role.age)    || 0,
         gender:                        role.gender           || '',
