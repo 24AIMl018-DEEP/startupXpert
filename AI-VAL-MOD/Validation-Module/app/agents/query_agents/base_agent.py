@@ -12,9 +12,19 @@ class BaseQueryAgent:
         raise NotImplementedError
 
     async def run(self, pitch: str, startup_data: Dict) -> Dict:
+        """
+        This Gonna Call in the nodes function
+        """
+        
         print(f"[QueryAgent:{self.name}] Generating queries...")
+        
         queries = generate_queries(self.name, self._build_prompt(pitch, startup_data))
+        
         print(f"[QueryAgent:{self.name}] queries={queries}")
+        
+        # Also Serch for the result
         results = await search_all_platforms(queries, self.platforms)
+        
         print(f"[QueryAgent:{self.name}] collected={len(results)}")
+        
         return {"agent": self.name, "queries": queries, "results": results}

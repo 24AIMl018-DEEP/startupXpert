@@ -1,28 +1,81 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Inter", "DM Sans", sans-serif;
-  --font-heading: "Inter", sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Inter", "DM Sans", sans-serif;
+  --font-heading: "Plus Jakarta Sans", "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
 }
 
+/* ── Global Base ── */
 @layer base {
   body {
-    font-family: 'Inter', 'DM Sans', sans-serif;
+    font-family: 'Plus Jakarta Sans', 'Inter', 'DM Sans', sans-serif;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     overflow-x: hidden;
     background-color: #0a0a0f;
     color: #f1f5f9;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 
-/* ── Dark Theme Bodies ── */
+/* ── CSS Custom Properties — Dark Mode (default) ── */
+:root {
+  --bg:           #060609;
+  --surface:      #0e0e18;
+  --surface2:     #12121e;
+  --border:       rgba(59, 130, 246, 0.1);
+  --text1:        #f1f5f9;
+  --text2:        #94a3b8;
+  --text3:        #4b5563;
+  --brand:        #2563eb;
+  --brand-bg:     rgba(37, 99, 235, 0.08);
+  --brand-border: rgba(37, 99, 235, 0.2);
+  --success:      #10b981;
+  --success-bg:   rgba(16, 185, 129, 0.08);
+  --warning:      #f59e0b;
+  --warning-bg:   rgba(245, 158, 11, 0.08);
+  --danger:       #f43f5e;
+  --danger-bg:    rgba(244, 63, 94, 0.08);
+  --track:        #1e1e2e;
+  --shadow:       0 1px 3px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3);
+  --shadow-md:    0 4px 20px rgba(0,0,0,0.5), 0 12px 40px rgba(0,0,0,0.4);
+}
+
+/* ── CSS Custom Properties — Light Mode ── */
+html[data-theme="light"],
+body[data-theme="light"],
+.ar-light-mode {
+  --bg:           #f8fafc;
+  --surface:      #ffffff;
+  --surface2:     #f1f5f9;
+  --border:       #e2e8f0;
+  --text1:        #0f172a;
+  --text2:        #475569;
+  --text3:        #94a3b8;
+  --brand:        #2563eb;
+  --brand-bg:     #eff6ff;
+  --brand-border: #bfdbfe;
+  --success:      #059669;
+  --success-bg:   #f0fdf4;
+  --warning:      #d97706;
+  --warning-bg:   #fffbeb;
+  --danger:       #dc2626;
+  --danger-bg:    #fef2f2;
+  --track:        #e2e8f0;
+  --shadow:       0 1px 3px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.04);
+  --shadow-md:    0 4px 24px rgba(0,0,0,0.08), 0 16px 48px rgba(0,0,0,0.05);
+}
+
+/* ── Dark Theme Bodies (Tailwind class-driven) ── */
 body.theme-dark-futurism {
   background-color: #0a0a0f;
   background-image:
-    radial-gradient(circle at 15% 25%, rgba(99, 102, 241, 0.05) 0%, transparent 45%),
-    radial-gradient(circle at 85% 75%, rgba(34, 211, 238, 0.05) 0%, transparent 45%),
-    linear-gradient(to right, rgba(99, 102, 241, 0.015) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(99, 102, 241, 0.015) 1px, transparent 1px);
+    radial-gradient(circle at 15% 25%, rgba(37, 99, 235, 0.04) 0%, transparent 45%),
+    radial-gradient(circle at 85% 75%, rgba(37, 99, 235, 0.03) 0%, transparent 45%),
+    linear-gradient(to right,  rgba(37, 99, 235, 0.012) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(37, 99, 235, 0.012) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
   background-attachment: fixed;
 }
@@ -31,8 +84,8 @@ body.theme-midnight-blue {
   background-color: #050b1a;
   background-image:
     radial-gradient(circle at 15% 25%, rgba(59, 130, 246, 0.05) 0%, transparent 45%),
-    radial-gradient(circle at 85% 75%, rgba(96, 165, 250, 0.05) 0%, transparent 45%),
-    linear-gradient(to right, rgba(59, 130, 246, 0.015) 1px, transparent 1px),
+    radial-gradient(circle at 85% 75%, rgba(96, 165, 250, 0.04) 0%, transparent 45%),
+    linear-gradient(to right,  rgba(59, 130, 246, 0.015) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(59, 130, 246, 0.015) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
   background-attachment: fixed;
@@ -42,8 +95,8 @@ body.theme-neo-emerald {
   background-color: #030c08;
   background-image:
     radial-gradient(circle at 15% 25%, rgba(16, 185, 129, 0.05) 0%, transparent 45%),
-    radial-gradient(circle at 85% 75%, rgba(52, 211, 153, 0.05) 0%, transparent 45%),
-    linear-gradient(to right, rgba(16, 185, 129, 0.012) 1px, transparent 1px),
+    radial-gradient(circle at 85% 75%, rgba(52, 211, 153, 0.04) 0%, transparent 45%),
+    linear-gradient(to right,  rgba(16, 185, 129, 0.012) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(16, 185, 129, 0.012) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
   background-attachment: fixed;
@@ -53,10 +106,10 @@ body.theme-neo-emerald {
 ::-webkit-scrollbar       { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #2d2d3f; border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+::-webkit-scrollbar-thumb:hover { background: #2563eb; }
 
 /* ── Selection ── */
-::selection { background-color: rgba(99, 102, 241, 0.25); color: #ffffff; }
+::selection { background-color: rgba(37, 99, 235, 0.2); color: #ffffff; }
 
 /* ── Animations ── */
 @keyframes float {
@@ -64,32 +117,49 @@ body.theme-neo-emerald {
   50%       { transform: translateY(-8px); }
 }
 @keyframes slideInLeft {
-  from { transform: translateX(-100%); }
-  to   { transform: translateX(0); }
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
 }
 @keyframes slideIn {
-  from { transform: translateX(100%); }
-  to   { transform: translateX(0); }
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
 }
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes shimmer {
+  from { background-position: -200% center; }
+  to   { background-position:  200% center; }
+}
 
-.animate-float { animation: float 6s ease-in-out infinite; }
+.animate-float      { animation: float 6s ease-in-out infinite; }
+.animate-fade-up    { animation: fadeInUp 0.4s ease-out both; }
+.animate-scale-in   { animation: scaleIn 0.3s ease-out both; }
 
-/* ── Custom Tiny Text Sizes (used in badges, labels) ── */
-.text-2xs  { font-size: 0.625rem;  line-height: 1rem; }   /* 10px */
-.text-3xs  { font-size: 0.5625rem; line-height: 0.875rem; } /* 9px  */
+/* ── Custom Tiny Text Sizes ── */
+.text-2xs  { font-size: 0.625rem;   line-height: 1rem; }
+.text-3xs  { font-size: 0.5625rem;  line-height: 0.875rem; }
 
 /* ── ReactFlow Canvas Fix ── */
 .react-flow__renderer { width: 100% !important; height: 100% !important; }
 .react-flow { width: 100% !important; height: 100% !important; }
 
-/* ── px-4.5 utility ── */
+/* ── Spacing Utilities ── */
 .px-4\.5 { padding-left: 1.125rem; padding-right: 1.125rem; }
-.py-3\.5 { padding-top: 0.875rem; padding-bottom: 0.875rem; }
+.py-3\.5 { padding-top: 0.875rem;  padding-bottom: 0.875rem; }
+.h-4\.5  { height: 1.125rem; }
+.w-4\.5  { width:  1.125rem; }
 
-/* ── h-4.5 / w-4.5 icon size ── */
-.h-4\.5 { height: 1.125rem; }
-.w-4\.5 { width: 1.125rem; }
+/* ── Analysis Result Light Mode Overrides ── */
+.ar-light-mode {
+  background: var(--bg);
+  color: var(--text1);
+}
+.ar-light-mode ::-webkit-scrollbar-thumb { background: #cbd5e1; }
+.ar-light-mode ::-webkit-scrollbar-thumb:hover { background: #2563eb; }
+.ar-light-mode ::selection { background-color: rgba(37,99,235,0.15); color: #0f172a; }
