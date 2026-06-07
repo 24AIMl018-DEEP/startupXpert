@@ -36,7 +36,9 @@ const ProtectedRoute = ({
   const isOnOnboardingPath = onboardingPaths.some(p => location.pathname.startsWith(p));
 
   // Gate 2 — onboarding must be complete before accessing any non-onboarding protected page
-  if (!skipOnboardingCheck && !user?.onboardingCompleted && !isOnOnboardingPath) {
+  // If user is logged in and userId exists, they've already completed onboarding (DB verified at login)
+  const isOnboardingDone = user?.onboardingCompleted || (isLoggedIn && !!user?.userId);
+  if (!skipOnboardingCheck && !isOnboardingDone && !isOnOnboardingPath) {
     return <Navigate to="/onboarding/role" replace />;
   }
 

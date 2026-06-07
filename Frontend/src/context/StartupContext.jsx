@@ -21,12 +21,33 @@ export const StartupProvider = ({ children }) => {
     const savedUser = localStorage.getItem('startup_user') || localStorage.getItem('startupxpert_user');
     const parsed = savedUser ? JSON.parse(savedUser) : null;
     if (parsed) {
-      // onboardingCompleted is determined by DB on login — default false here
-      // Login.jsx sets it after DB check
       return parsed;
     }
     return { fullName: '', email: '', role: 'Founder', avatarUrl: '', isNewUser: false, onboardingCompleted: false };
   });
+
+  const [isLoggedIn, setIsLoggedIn] = useState(() => {
+    return localStorage.getItem('isLoggedIn') === 'true';
+  });
+
+  // On mount: if user is logged in but userId is missing from localStorage,
+  // restore it from Supabase session so API calls work correctly
+  useEffect(() => {
+    if (isLoggedIn && !user?.userId) {
+      import('../services/authService').then(({ getCurrentUserId }) => {
+        getCurrentUserId().then(id => {
+          if (id) {
+            setUser(prev => {
+              const updated = { ...prev, userId: id, onboardingCompleted: true };
+              localStorage.setItem('startup_user', JSON.stringify(updated));
+              localStorage.setItem('startupxpert_user', JSON.stringify(updated));
+              return updated;
+            });
+          }
+        });
+      });
+    }
+  }, [isLoggedIn]);
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
     return localStorage.getItem('isLoggedIn') === 'true';
