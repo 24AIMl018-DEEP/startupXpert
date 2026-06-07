@@ -50,25 +50,14 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AI Startup Validator", version="2.0.0", lifespan=lifespan)
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
-# allow_credentials=True is incompatible with wildcard origins per CORS spec.
-# Use allow_origin_regex to match all origins when wildcard is set.
-if "*" in ALLOWED_ORIGINS:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=r".*",
-        allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-else:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=ALLOWED_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# Ultra-permissive CORS for frontend (allows credentials and all origins dynamically)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r".*",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(RequestValidationError)
@@ -106,9 +95,14 @@ async def validate(startup_data: StartupInput):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+from fastapi import Depends
+from shared.core.auth import get_current_user
+
 @app.get("/api/v1/sessions/{user_id}")
-def get_user_sessions(user_id: str):
+def get_user_sessions(user_id: str, current_user = Depends(get_current_user)):
     """Return all startup_input session IDs + metadata for a user."""
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     try:
         from shared.db.supabase_client import get_supabase
         res = get_supabase().table("startup_input") \
@@ -122,8 +116,10 @@ def get_user_sessions(user_id: str):
 
 
 @app.get("/api/v1/sessions/{user_id}/latest")
-def get_latest_session(user_id: str):
+def get_latest_session(user_id: str, current_user = Depends(get_current_user)):
     """Return the most recent validated session for a user (pipeline_output exists)."""
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     try:
         from shared.db.supabase_client import get_supabase
         db = get_supabase()

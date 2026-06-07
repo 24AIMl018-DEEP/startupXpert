@@ -39,23 +39,14 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Startup Roadmap Generator", version="2.0.0")
 
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
-if "*" in ALLOWED_ORIGINS:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=r".*",
-        allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-else:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=ALLOWED_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# Ultra-permissive CORS for frontend (allows credentials and all origins dynamically)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origin_regex=r".*",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(RequestValidationError)
@@ -144,11 +135,16 @@ async def generate_roadmap(payload: RoadmapRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+from fastapi import Depends
+from shared.core.auth import get_current_user
+
 # ── User-scoped idea & roadmap queries ────────────────────────────────────────
 
 @app.get("/api/v1/sessions/{user_id}")
-def get_user_sessions(user_id: str):
+def get_user_sessions(user_id: str, current_user = Depends(get_current_user)):
     """Return all startup_input sessions for a user, with validation status."""
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     try:
         return get_validated_sessions_by_user(user_id)
     except Exception as e:
@@ -156,8 +152,10 @@ def get_user_sessions(user_id: str):
 
 
 @app.get("/api/v1/sessions/{user_id}/latest")
-def get_user_latest_session(user_id: str):
+def get_user_latest_session(user_id: str, current_user = Depends(get_current_user)):
     """Return the most recent completed validation session for a user."""
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
     try:
         session = get_latest_validated_session(user_id)
         return {"found": session is not None, "session": session}
@@ -166,8 +164,12 @@ def get_user_latest_session(user_id: str):
 
 
 @app.get("/api/v1/roadmap/{session_id}")
-def get_session_roadmap(session_id: str):
+def get_session_roadmap(session_id: str, current_user = Depends(get_current_user)):
     """Return full roadmap (profiler + branches + tasks) for a validated session."""
+    from services.db.reader import get_startup_input
+    session_data = get_startup_input(session_id)
+    if not session_data or session_data.get("user_id") != current_user.id:
+        raise HTTPException(status_code=403, detail="Access denied. This roadmap does not belong to you.")
     profiler = get_roadmap_profiler(session_id)
     if not profiler:
         raise HTTPException(status_code=404, detail="No roadmap found for this session.")

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ReactFlow, { MiniMap, Controls, Background, MarkerType, Handle, Position } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -8,54 +8,109 @@ import DashboardLayout from '../layouts/DashboardLayout';
 import {
   Plus, Trash2, Compass, X, Check, Sparkles, Download,
   PlusCircle, User, Users, Clock, AlertTriangle, CheckCircle2,
-  ChevronDown, ChevronUp, Lock
+  ChevronDown, ChevronUp, Lock, Sun, Moon, Target, Activity, Zap
 } from 'lucide-react';
-import jsPDF from 'jspdf';
 
-// ── Custom ReactFlow Node ─────────────────────────────────────────────────────
+// ── Theme tokens mapping to our CSS custom properties ────────────────────────
+const getTokens = (isLight) => ({
+  bg:         isLight ? '#f8fafc' : '#060609',
+  surface:    isLight ? '#ffffff' : '#0e0e18',
+  surface2:   isLight ? '#f1f5f9' : '#12121e',
+  border:     isLight ? '#e2e8f0' : 'rgba(59,130,246,0.1)',
+  border2:    isLight ? '#cbd5e1' : 'rgba(59,130,246,0.18)',
+  text1:      isLight ? '#0f172a' : '#f1f5f9',
+  text2:      isLight ? '#475569' : '#94a3b8',
+  text3:      isLight ? '#94a3b8' : '#4b5563',
+  brand:      '#2563eb',
+  brandLight: isLight ? '#2563eb' : '#3b82f6',
+  brandBg:    isLight ? '#eff6ff' : 'rgba(37,99,235,0.08)',
+  brandBdr:   isLight ? '#bfdbfe' : 'rgba(37,99,235,0.2)',
+  success:    isLight ? '#059669' : '#10b981',
+  successBg:  isLight ? '#f0fdf4' : 'rgba(16,185,129,0.08)',
+  successBdr: isLight ? '#bbf7d0' : 'rgba(16,185,129,0.2)',
+  warning:    isLight ? '#d97706' : '#f59e0b',
+  warningBg:  isLight ? '#fffbeb' : 'rgba(245,158,11,0.08)',
+  warningBdr: isLight ? '#fde68a' : 'rgba(245,158,11,0.2)',
+  danger:     isLight ? '#dc2626' : '#f43f5e',
+  dangerBg:   isLight ? '#fef2f2' : 'rgba(244,63,94,0.08)',
+  dangerBdr:  isLight ? '#fecaca' : 'rgba(244,63,94,0.2)',
+  purple:     '#7c3aed',
+  purpleBg:   isLight ? '#f5f3ff' : 'rgba(124,58,237,0.08)',
+  purpleBdr:  isLight ? '#ede9fe' : 'rgba(124,58,237,0.2)',
+  track:      isLight ? '#e2e8f0' : '#1e1e2e',
+  shadow:     isLight ? '0 1px 3px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.04)'
+                      : '0 1px 3px rgba(0,0,0,0.4),0 4px 12px rgba(0,0,0,0.3)',
+  shadowMd:   isLight ? '0 4px 24px rgba(0,0,0,0.07),0 16px 48px rgba(0,0,0,0.04)'
+                      : '0 4px 24px rgba(0,0,0,0.5),0 16px 48px rgba(0,0,0,0.4)',
+});
+
+// ── Custom ReactFlow Node (Premium Design) ───────────────────────────────────
 const CustomRoadmapNode = ({ data }) => {
   const isRoot = data.id === 'root';
-  const borderMap = {
-    Completed:   'border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.15)]',
-    'In Progress':'border-indigo-500/50 shadow-[0_0_20px_rgba(99,102,241,0.2)]',
-    Blocked:     'border-rose-500/50 shadow-[0_0_20px_rgba(244,63,94,0.15)]',
+  const { isLight } = data;
+  const T = getTokens(isLight);
+
+  const statusConfig = {
+    Completed:   { color: T.success, bg: T.successBg, border: T.successBdr },
+    'In Progress':{ color: T.brandLight, bg: T.brandBg, border: T.brandBdr },
+    Blocked:     { color: T.danger, bg: T.dangerBg, border: T.dangerBdr },
+    Pending:     { color: T.text2, bg: T.surface2, border: T.border2 },
   };
-  const badgeMap = {
-    Completed:   'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    'In Progress':'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
-    Blocked:     'bg-rose-500/10 text-rose-400 border-rose-500/20',
+
+  const priorityConfig = {
+    High:   { color: T.danger, bg: T.dangerBg, border: T.dangerBdr },
+    Medium: { color: T.warning, bg: T.warningBg, border: T.warningBdr },
+    Low:    { color: T.text2, bg: T.surface2, border: T.border2 },
   };
-  const borderClass = borderMap[data.status] || 'border-indigo-500/10';
-  const badgeClass  = badgeMap[data.status]  || 'bg-gray-500/10 text-gray-400 border-gray-500/20';
-  const priorityClass = data.priority === 'High'
-    ? 'bg-rose-500/10 text-rose-400 border-rose-500/20'
-    : data.priority === 'Medium'
-      ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-      : 'bg-slate-500/10 text-slate-400 border-slate-500/20';
+
+  const st = statusConfig[data.status] || statusConfig.Pending;
+  const pr = priorityConfig[data.priority] || priorityConfig.Medium;
 
   return (
     <div
       onClick={data.onClick}
-      className={`p-4 rounded-xl border bg-[#0e0e16]/95 backdrop-blur-md transition-all duration-300 min-w-[240px] max-w-[280px] text-left relative cursor-pointer hover:scale-[1.02] hover:border-indigo-500/40 select-none ${borderClass}`}
+      style={{
+        background: T.surface,
+        border: `1px solid ${data.isSelected ? st.color : T.border}`,
+        boxShadow: data.isSelected ? `0 0 0 1px ${st.color}, ${T.shadowMd}` : T.shadow,
+        borderRadius: 14,
+        padding: 16,
+        minWidth: 260,
+        maxWidth: 300,
+        cursor: 'pointer',
+        transition: 'all 0.2s ease',
+        transform: data.isSelected ? 'scale(1.02)' : 'scale(1)',
+      }}
+      className="roadmap-node-container"
     >
-      {!isRoot && <Handle type="target" position={Position.Left} style={{ background: '#6366f1', width: 8, height: 8, border: '2px solid #0e0e16' }} />}
+      {!isRoot && <Handle type="target" position={Position.Left} style={{ background: st.color, width: 8, height: 8, border: `2px solid ${T.surface}` }} />}
 
-      <div className="space-y-2">
-        <div className="flex justify-between items-center gap-2">
-          <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded tracking-wider border ${badgeClass}`}>{data.status}</span>
-          <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded tracking-wider border ${priorityClass}`}>{data.priority || 'Medium'}</span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Badges */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '3px 8px', borderRadius: 20, color: st.color, background: st.bg, border: `1px solid ${st.border}` }}>
+            {data.status}
+          </span>
+          <span style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', padding: '3px 8px', borderRadius: 20, color: pr.color, background: pr.bg, border: `1px solid ${pr.border}` }}>
+            {data.priority || 'Medium'}
+          </span>
         </div>
-        <h4 className="text-xs font-bold text-white truncate">{data.title}</h4>
-        <p className="text-[10px] text-gray-500 line-clamp-2 leading-relaxed">{data.description}</p>
 
+        {/* Text */}
+        <div>
+          <h4 style={{ fontSize: 13, fontWeight: 700, color: T.text1, margin: '0 0 4px', lineHeight: 1.3 }}>{data.title}</h4>
+          <p style={{ fontSize: 11, color: T.text2, margin: 0, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{data.description}</p>
+        </div>
+
+        {/* Progress Bar */}
         {data.tasksCount > 0 && (
-          <div className="pt-1.5 border-t border-indigo-500/5 space-y-1">
-            <div className="flex justify-between text-[9px] font-mono text-gray-500">
+          <div style={{ marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: T.text3, fontWeight: 600, marginBottom: 4 }}>
               <span>{data.tasksCount} tasks</span>
-              <span>{Math.round(data.progress)}%</span>
+              <span style={{ color: T.brandLight }}>{Math.round(data.progress)}%</span>
             </div>
-            <div className="h-1.5 w-full bg-[#0a0a0f] rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 rounded-full" style={{ width: `${data.progress}%` }} />
+            <div style={{ height: 6, width: '100%', background: T.track, borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ height: '100%', background: st.color, width: `${data.progress}%`, transition: 'width 0.4s ease' }} />
             </div>
           </div>
         )}
@@ -64,20 +119,29 @@ const CustomRoadmapNode = ({ data }) => {
       {data.hasChildren && (
         <button
           onClick={(e) => { e.stopPropagation(); data.onToggleExpand(); }}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full border border-indigo-500/30 bg-[#0e0e16] hover:bg-indigo-600 text-indigo-400 hover:text-white text-xs font-bold z-20"
+          style={{
+            position: 'absolute', right: -12, top: '50%', transform: 'translateY(-50%)',
+            width: 24, height: 24, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: T.surface, border: `1px solid ${T.border}`, color: T.text2,
+            fontSize: 14, fontWeight: 800, cursor: 'pointer', zIndex: 20, boxShadow: T.shadow,
+            transition: 'all 0.2s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.color = T.brandLight; e.currentTarget.style.borderColor = T.brandLight; }}
+          onMouseLeave={e => { e.currentTarget.style.color = T.text2; e.currentTarget.style.borderColor = T.border; }}
         >
           {data.isExpanded ? '−' : '+'}
         </button>
       )}
-      <Handle type="source" position={Position.Right} style={{ background: '#6366f1', width: 8, height: 8, border: '2px solid #0e0e16' }} />
+      <Handle type="source" position={Position.Right} style={{ background: st.color, width: 8, height: 8, border: `2px solid ${T.surface}` }} />
     </div>
   );
 };
 
 const nodeTypes = { roadmapNode: CustomRoadmapNode };
 
-// ── Team Input Modal ──────────────────────────────────────────────────────────
-const TeamModal = ({ onConfirm, onCancel, isGenerating }) => {
+// ── Team Input Modal ─────────────────────────────────────────────────────────
+const TeamModal = ({ onConfirm, onCancel, isGenerating, isLight }) => {
+  const T = getTokens(isLight);
   const [members, setMembers] = useState([{ name: '', role: '', skills: '' }]);
 
   const addMember = () => setMembers(m => [...m, { name: '', role: '', skills: '' }]);
@@ -92,48 +156,46 @@ const TeamModal = ({ onConfirm, onCancel, isGenerating }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-indigo-500/20 bg-[#0e0e16] shadow-[0_0_60px_rgba(99,102,241,0.15)] overflow-hidden">
-
-        <div className="px-6 py-5 border-b border-indigo-500/10 flex items-center justify-between">
+    <div style={{ position: 'fixed', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', padding: 16 }}>
+      <div style={{ width: '100%', maxWidth: 540, borderRadius: 20, background: T.surface, border: `1px solid ${T.border}`, boxShadow: T.shadowMd, overflow: 'hidden' }}>
+        
+        <div style={{ padding: '20px 24px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <h2 className="font-heading text-base font-bold text-white">Team Setup</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Add your team members — the AI will assign tasks based on roles and skills.</p>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: T.text1, margin: 0 }}>Team Setup</h2>
+            <p style={{ fontSize: 13, color: T.text2, margin: '2px 0 0' }}>Add team members to map tasks directly to resources.</p>
           </div>
-          <button onClick={onCancel} className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-500/5 text-gray-500 hover:text-white transition-all">
-            <X className="h-4 w-4" />
+          <button onClick={onCancel} style={{ width: 32, height: 32, borderRadius: 8, background: T.surface2, border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', color: T.text2, cursor: 'pointer' }}>
+            <X size={16} />
           </button>
         </div>
 
-        <div className="px-6 py-4 space-y-3 max-h-72 overflow-y-auto">
+        <div style={{ padding: '20px 24px', maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 12 }}>
           {members.map((m, i) => (
-            <div key={i} className="rounded-xl border border-indigo-500/10 bg-[#0a0a0f] p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Member {i + 1}</span>
+            <div key={i} style={{ background: T.surface2, border: `1px solid ${T.border}`, borderRadius: 12, padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <span style={{ fontSize: 10, fontWeight: 800, color: T.brandLight, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Team Member {i + 1}</span>
                 {members.length > 1 && (
-                  <button onClick={() => removeMember(i)} className="text-gray-600 hover:text-rose-400 transition-colors">
-                    <Trash2 className="h-3.5 w-3.5" />
+                  <button onClick={() => removeMember(i)} style={{ background: 'none', border: 'none', color: T.text3, cursor: 'pointer' }}>
+                    <Trash2 size={14} />
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <input value={m.name} onChange={e => updateMember(i, 'name', e.target.value)} placeholder="Full Name *" className="rounded-lg border border-indigo-500/10 bg-[#0e0e16] px-3 py-2 text-xs text-white focus:border-indigo-500 outline-none" />
-                <input value={m.role} onChange={e => updateMember(i, 'role', e.target.value)} placeholder="Role (e.g. CTO)" className="rounded-lg border border-indigo-500/10 bg-[#0e0e16] px-3 py-2 text-xs text-white focus:border-indigo-500 outline-none" />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <input value={m.name} onChange={e => updateMember(i, 'name', e.target.value)} placeholder="Full Name *" style={{ width: '100%', borderRadius: 8, border: `1px solid ${T.border2}`, background: T.surface, padding: '10px 12px', fontSize: 13, color: T.text1, outline: 'none' }} />
+                <input value={m.role} onChange={e => updateMember(i, 'role', e.target.value)} placeholder="Role (e.g. CTO)" style={{ width: '100%', borderRadius: 8, border: `1px solid ${T.border2}`, background: T.surface, padding: '10px 12px', fontSize: 13, color: T.text1, outline: 'none' }} />
               </div>
-              <input value={m.skills} onChange={e => updateMember(i, 'skills', e.target.value)} placeholder="Skills (comma-separated: React, Python, Marketing)" className="w-full rounded-lg border border-indigo-500/10 bg-[#0e0e16] px-3 py-2 text-xs text-white focus:border-indigo-500 outline-none" />
+              <input value={m.skills} onChange={e => updateMember(i, 'skills', e.target.value)} placeholder="Skills (comma-separated: React, Python, Marketing)" style={{ width: '100%', boxSizing: 'border-box', borderRadius: 8, border: `1px solid ${T.border2}`, background: T.surface, padding: '10px 12px', fontSize: 13, color: T.text1, outline: 'none' }} />
             </div>
           ))}
-          <button onClick={addMember} className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-dashed border-indigo-500/20 py-2.5 text-xs text-indigo-400 hover:border-indigo-500/40 hover:text-indigo-300 transition-all">
-            <Plus className="h-3.5 w-3.5" />Add Member
+          <button onClick={addMember} style={{ width: '100%', padding: 12, borderRadius: 12, border: `1px dashed ${T.brandBdr}`, background: 'transparent', color: T.brandLight, fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+            <Plus size={14} /> Add Member
           </button>
         </div>
 
-        <div className="px-6 py-4 border-t border-indigo-500/10 flex gap-3">
-          <button onClick={onCancel} className="flex-1 rounded-lg border border-indigo-500/10 bg-indigo-500/5 py-2.5 text-xs font-bold text-gray-400 hover:text-white transition-all">
-            Cancel
-          </button>
-          <button onClick={handleConfirm} disabled={isGenerating} className="flex-1 flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 py-2.5 text-xs font-bold text-white transition-all">
-            {isGenerating ? <><div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />Generating...</> : <><Sparkles className="h-3.5 w-3.5" />Generate Roadmap</>}
+        <div style={{ padding: '20px 24px', borderTop: `1px solid ${T.border}`, display: 'flex', gap: 12 }}>
+          <button onClick={onCancel} style={{ flex: 1, padding: '12px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.surface2, color: T.text2, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+          <button onClick={handleConfirm} disabled={isGenerating} style={{ flex: 1, padding: '12px', borderRadius: 10, border: 'none', background: T.brand, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            {isGenerating ? 'Generating...' : <><Sparkles size={14} /> Generate Roadmap</>}
           </button>
         </div>
       </div>
@@ -141,10 +203,10 @@ const TeamModal = ({ onConfirm, onCancel, isGenerating }) => {
   );
 };
 
-// ── Main Roadmap Page ─────────────────────────────────────────────────────────
+// ── Main Roadmap Page ────────────────────────────────────────────────────────
 const Roadmap = () => {
   const navigate = useNavigate();
-  const { user, startupDetails, analysisScores, roadmapNodes, roadmapData, isGeneratingRoadmap, generateRoadmap, updateRoadmapNode, addRoadmapNode, deleteRoadmapNode, manageSubTask, manageNote } = useStartup();
+  const { user, startupDetails, roadmapNodes, isGeneratingRoadmap, generateRoadmap, updateRoadmapNode, addRoadmapNode, deleteRoadmapNode, manageSubTask, manageNote } = useStartup();
   const { showToast } = useToast();
 
   const [selectedNodeId, setSelectedNodeId]   = useState(null);
@@ -155,10 +217,12 @@ const Roadmap = () => {
   const [childTitle, setChildTitle]           = useState('');
   const [childDesc, setChildDesc]             = useState('');
   const [expandedTaskId, setExpandedTaskId]   = useState(null);
+  const [isLight, setIsLight]                 = useState(true);
 
+  const T = getTokens(isLight);
   const activeNode = useMemo(() => roadmapNodes.find(n => n.id === selectedNodeId) || null, [roadmapNodes, selectedNodeId]);
 
-  // ── Layout algorithm ───────────────────────────────────────────────────────
+  // Layout algo
   const getLayoutedElements = useCallback((nodes) => {
     const parentMap = {};
     nodes.forEach(n => { if (n.parentId) { parentMap[n.parentId] = parentMap[n.parentId] || []; parentMap[n.parentId].push(n); } });
@@ -168,14 +232,13 @@ const Roadmap = () => {
     const place = (pid, px, py) => {
       const kids = parentMap[pid] || [];
       if (!kids.length) return;
-      const gap = 170, total = (kids.length - 1) * gap;
-      kids.forEach((k, i) => { pos[k.id] = { x: px + 290, y: py - total / 2 + i * gap }; place(k.id, px + 290, py - total / 2 + i * gap); });
+      const gap = 200, total = (kids.length - 1) * gap;
+      kids.forEach((k, i) => { pos[k.id] = { x: px + 350, y: py - total / 2 + i * gap }; place(k.id, px + 350, py - total / 2 + i * gap); });
     };
     place(root.id, 60, 300);
     return nodes.map(n => ({ ...n, position: pos[n.id] || { x: 100, y: 100 } }));
   }, []);
 
-  // ── ReactFlow elements ─────────────────────────────────────────────────────
   const elements = useMemo(() => {
     const collapsed = new Set(roadmapNodes.filter(n => n.isExpanded === false).map(n => n.id));
     const getDesc = pid => { const kids = roadmapNodes.filter(n => n.parentId === pid); return [...kids.map(k => k.id), ...kids.flatMap(k => getDesc(k.id))]; };
@@ -194,6 +257,8 @@ const Roadmap = () => {
           progress: total > 0 ? (done / total) * 100 : 0,
           tasksCount: total, isExpanded: node.isExpanded,
           hasChildren: roadmapNodes.some(n => n.parentId === node.id),
+          isSelected: node.id === selectedNodeId,
+          isLight,
           onToggleExpand: () => updateRoadmapNode(node.id, { isExpanded: !node.isExpanded }),
           onClick: () => { setSelectedNodeId(node.id); setIsDrawerOpen(true); }
         }
@@ -203,12 +268,12 @@ const Roadmap = () => {
     const rfEdges = visible.filter(n => n.parentId).map(n => ({
       id: `e-${n.parentId}-${n.id}`, source: n.parentId, target: n.id, type: 'smoothstep',
       animated: n.status === 'In Progress',
-      style: { stroke: n.status === 'Completed' ? '#10b981' : n.status === 'In Progress' ? '#6366f1' : 'rgba(99,102,241,0.2)', strokeWidth: 2 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: n.status === 'Completed' ? '#10b981' : n.status === 'In Progress' ? '#6366f1' : 'rgba(99,102,241,0.2)' }
+      style: { stroke: n.status === 'Completed' ? T.success : n.status === 'In Progress' ? T.brandLight : T.border2, strokeWidth: 2 },
+      markerEnd: { type: MarkerType.ArrowClosed, color: n.status === 'Completed' ? T.success : n.status === 'In Progress' ? T.brandLight : T.border2 }
     }));
 
     return { nodes: rfNodes, edges: rfEdges };
-  }, [roadmapNodes, updateRoadmapNode, getLayoutedElements]);
+  }, [roadmapNodes, updateRoadmapNode, getLayoutedElements, isLight, selectedNodeId, T]);
 
   const totals = useMemo(() => {
     const total = roadmapNodes.reduce((a, n) => a + (n.tasks?.length || 0), 0);
@@ -216,14 +281,8 @@ const Roadmap = () => {
     return { total, done, percent: total > 0 ? Math.round((done / total) * 100) : 0 };
   }, [roadmapNodes]);
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
   const handleGenerateClick = () => {
-    // Gate: must have a validated session — check via user.userId (DB-backed)
-    // roadmapNodes check: if user has roadmap nodes loaded, they came from DB already
-    if (!user?.userId) {
-      showToast('Please log in again to continue.', 'error');
-      return;
-    }
+    if (!user?.userId) { showToast('Please log in again to continue.', 'error'); return; }
     setShowTeamModal(true);
   };
 
@@ -237,182 +296,113 @@ const Roadmap = () => {
   const handleAddChild  = (e) => { e.preventDefault(); if (!childTitle.trim()) return; addRoadmapNode(selectedNodeId, childTitle, childDesc); setChildTitle(''); setChildDesc(''); };
   const handleDeleteNode = () => { if (selectedNodeId === 'root') { showToast('Cannot delete root node.', 'error'); return; } deleteRoadmapNode(selectedNodeId); setIsDrawerOpen(false); setSelectedNodeId(null); };
 
-  const depStatusColor = (s) => {
-    if (s === 'Ready') return 'text-emerald-400';
-    if (s === 'Blocked') return 'text-rose-400';
-    return 'text-gray-400';
-  };
-
   return (
     <DashboardLayout activeTab="roadmap">
-      <div className="space-y-5 text-left relative" style={{ minHeight: 'calc(100vh - 80px)' }}>
+      <div style={{ background: T.bg, minHeight: 'calc(100vh - 80px)', fontFamily: "'Plus Jakarta Sans','Inter',sans-serif", color: T.text1, padding: 24, transition: 'background 0.3s, color 0.3s', position: 'relative' }}>
+        
+        {showTeamModal && <TeamModal onConfirm={handleTeamConfirm} onCancel={() => setShowTeamModal(false)} isGenerating={isGeneratingRoadmap} isLight={isLight} />}
 
-        {/* Team Modal */}
-        {showTeamModal && (
-          <TeamModal
-            onConfirm={handleTeamConfirm}
-            onCancel={() => setShowTeamModal(false)}
-            isGenerating={isGeneratingRoadmap}
-          />
-        )}
-
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-indigo-500/5 pb-4">
+        {/* ── HEADER ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 16, marginBottom: 24, borderBottom: `1px solid ${T.border}`, paddingBottom: 24 }}>
           <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-indigo-400">Startup OS</span>
-            <h1 className="font-heading text-2xl font-extrabold text-white mt-1">
-              {startupDetails.startupName || 'Venture'} — AI Roadmap
-            </h1>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {roadmapNodes.length > 0 ? 'Click any branch to view tasks, assign notes, and track progress.' : 'Generate a personalized AI roadmap based on your validation results.'}
-            </p>
+            <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: T.brandLight, background: T.brandBg, border: `1px solid ${T.brandBdr}`, padding: '4px 12px', borderRadius: 20 }}>
+              Execution OS
+            </span>
+            <h1 style={{ fontSize: 28, fontWeight: 800, color: T.text1, margin: '12px 0 4px', letterSpacing: '-0.02em' }}>{startupDetails.startupName || 'Venture'} Roadmap</h1>
+            <p style={{ fontSize: 13, color: T.text2, margin: 0 }}>Visual mission control for your validated product strategy.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <button
-              onClick={handleGenerateClick}
-              disabled={isGeneratingRoadmap}
-              className="flex items-center gap-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white px-4 py-2.5 text-xs font-bold uppercase tracking-wider shadow-lg shadow-indigo-600/10 transition-all"
-            >
-              {isGeneratingRoadmap
-                ? <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />Generating...</>
-                : <><Sparkles className="h-4 w-4" />{roadmapNodes.length > 0 ? 'Regenerate' : 'Generate Roadmap'}</>}
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => setIsLight(!isLight)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, color: T.text2, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: T.shadow }}>
+              {isLight ? <Moon size={14} /> : <Sun size={14} />} {isLight ? 'Dark' : 'Light'}
+            </button>
+            <button onClick={handleGenerateClick} disabled={isGeneratingRoadmap} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 20px', borderRadius: 8, border: 'none', background: T.brand, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: T.shadow, opacity: isGeneratingRoadmap ? 0.6 : 1 }}>
+              {isGeneratingRoadmap ? 'Generating...' : <><Sparkles size={14} /> {roadmapNodes.length > 0 ? 'Regenerate' : 'Generate Roadmap'}</>}
             </button>
           </div>
         </div>
 
-        {/* Stats bar */}
+        {/* ── STATS BAR ── */}
         {roadmapNodes.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-xl border border-indigo-500/5 bg-indigo-950/10 p-4">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 16, marginBottom: 24 }}>
             {[
-              ['Branches',   roadmapNodes.filter(n => n.parentId === 'root').length, 'text-indigo-400'],
-              ['Total Tasks',totals.total, 'text-white'],
-              ['Completed',  totals.done,  'text-emerald-400'],
-              ['Progress',   `${totals.percent}%`, 'text-cyan-400'],
-            ].map(([label, val, cls]) => (
-              <div key={label} className="text-center">
-                <p className={`text-xl font-black font-mono ${cls}`}>{val}</p>
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider mt-0.5">{label}</p>
+              { label: 'Total Branches', val: roadmapNodes.filter(n => n.parentId === 'root').length, c: T.brandLight },
+              { label: 'Action Items',   val: totals.total, c: T.text1 },
+              { label: 'Completed',      val: totals.done,  c: T.success },
+              { label: 'Velocity',       val: `${totals.percent}%`, c: T.purple },
+            ].map((s) => (
+              <div key={s.label} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: '16px 20px', boxShadow: T.shadow }}>
+                <p style={{ fontSize: 24, fontWeight: 900, color: s.c, margin: 0, fontFamily: "'JetBrains Mono', monospace" }}>{s.val}</p>
+                <p style={{ fontSize: 11, fontWeight: 600, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '4px 0 0' }}>{s.label}</p>
               </div>
             ))}
           </div>
         )}
 
-        {/* Empty State — two variants: no validation vs validated but no roadmap */}
+        {/* ── EMPTY STATES ── */}
         {roadmapNodes.length === 0 && !isGeneratingRoadmap && (() => {
-          // Use user.userId presence as proxy for "has validated" — actual check happens in generateRoadmap
-          const hasValidatedSession = !!user?.userId;
-
-          if (!hasValidatedSession) {
-            // No validated idea at all
-            return (
-              <div className="rounded-2xl border border-amber-500/15 bg-amber-950/10 p-16 text-center space-y-5">
-                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-amber-500/20 bg-amber-500/5 text-amber-400">
-                  <AlertTriangle className="h-8 w-8" />
-                </div>
-                <div className="space-y-2 max-w-sm mx-auto">
-                  <h3 className="text-base font-bold text-white">Validate an Idea First</h3>
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    Your roadmap is built on validated data. Complete the idea validation process before generating a roadmap.
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigate('/onboarding/role')}
-                  className="inline-flex items-center gap-2 rounded-xl bg-amber-600 hover:bg-amber-500 text-white px-6 py-3 text-xs font-bold uppercase tracking-wider transition-all"
-                >
-                  <Plus className="h-4 w-4" />Validate My Idea
-                </button>
-              </div>
-            );
-          }
-
-          // Has a validated idea, just no roadmap generated yet
+          if (!user?.userId) return (
+            <div style={{ textAlign: 'center', padding: '60px 20px', background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16 }}>
+              <AlertTriangle size={48} style={{ color: T.warning, margin: '0 auto 16px' }} />
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: T.text1, margin: '0 0 8px' }}>Validation Required</h3>
+              <p style={{ fontSize: 14, color: T.text2, margin: '0 auto 24px', maxWidth: 400 }}>Your roadmap is built on validated data. Complete idea validation first.</p>
+              <button onClick={() => navigate('/onboarding/role')} style={{ padding: '12px 24px', borderRadius: 8, background: T.warning, color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer' }}>Validate My Idea</button>
+            </div>
+          );
           return (
-            <div className="rounded-2xl border border-indigo-500/10 bg-[#0e0e16]/60 p-16 text-center space-y-5">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-indigo-500/20 bg-indigo-500/5 text-indigo-400">
-                <Compass className="h-8 w-8" />
-              </div>
-              <div className="space-y-2 max-w-sm mx-auto">
-                <h3 className="text-base font-bold text-white">No Roadmap Generated Yet</h3>
-                <p className="text-xs text-gray-500 leading-relaxed">
-                  Your idea is validated. Click <span className="text-indigo-400 font-semibold">Generate Roadmap</span> to build a personalized execution plan — add your team and the AI assigns tasks by role and skill.
-                </p>
-              </div>
-              <button
-                onClick={handleGenerateClick}
-                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 text-xs font-bold uppercase tracking-wider shadow-lg shadow-indigo-600/10 transition-all"
-              >
-                <Sparkles className="h-4 w-4" />Generate My Roadmap
-              </button>
+            <div style={{ textAlign: 'center', padding: '80px 20px', background: T.surface, border: `1px dashed ${T.border2}`, borderRadius: 16 }}>
+              <Compass size={48} style={{ color: T.brandLight, margin: '0 auto 16px' }} />
+              <h3 style={{ fontSize: 18, fontWeight: 700, color: T.text1, margin: '0 0 8px' }}>Map Your Journey</h3>
+              <p style={{ fontSize: 14, color: T.text2, margin: '0 auto 24px', maxWidth: 450 }}>Generate an AI-powered execution plan tailored to your team's skills and your startup's validation profile.</p>
+              <button onClick={handleGenerateClick} style={{ padding: '12px 24px', borderRadius: 8, background: T.brand, color: '#fff', border: 'none', fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}><Sparkles size={16} /> Generate Roadmap</button>
             </div>
           );
         })()}
 
-        {/* Loading state */}
-        {isGeneratingRoadmap && (
-          <div className="rounded-2xl border border-indigo-500/10 bg-[#0e0e16]/60 p-16 text-center space-y-4">
-            <div className="mx-auto h-12 w-12 rounded-full border-2 border-indigo-500 border-t-transparent animate-spin" />
-            <p className="text-sm font-bold text-white">AI is building your roadmap...</p>
-            <p className="text-xs text-gray-500">Analyzing validation data, assigning tasks, mapping dependencies.</p>
-          </div>
-        )}
-
-        {/* Canvas */}
+        {/* ── CANVAS ── */}
         {roadmapNodes.length > 0 && (
-          <div className="w-full border border-indigo-500/10 bg-[#0e0e16]/40 rounded-2xl overflow-hidden relative shadow-[0_0_50px_rgba(0,0,0,0.5)]" style={{ height: '580px' }}>
+          <div style={{ width: '100%', height: 600, background: T.surface2, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden', boxShadow: T.shadowMd, position: 'relative' }}>
             <ReactFlow
-              nodes={elements.nodes}
-              edges={elements.edges}
-              nodeTypes={nodeTypes}
-              fitView
-              fitViewOptions={{ padding: 0.3 }}
-              minZoom={0.15}
-              maxZoom={2}
-              style={{ width: '100%', height: '100%' }}
+              nodes={elements.nodes} edges={elements.edges} nodeTypes={nodeTypes}
+              fitView fitViewOptions={{ padding: 0.3 }} minZoom={0.2} maxZoom={2}
               proOptions={{ hideAttribution: true }}
             >
-              <Background color="rgba(99,102,241,0.04)" gap={16} size={1} />
-              <Controls className="!bg-[#0e0e16] !border-indigo-500/20" />
-              <MiniMap className="!bg-[#0e0e16]/90 !border-indigo-500/20" nodeColor={() => '#1e1e2f'} maskColor="rgba(10,10,15,0.6)" />
+              <Background color={T.border2} gap={24} size={1} />
+              <Controls style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8, overflow: 'hidden' }} />
+              <MiniMap style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 8 }} maskColor={isLight ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.6)'} />
             </ReactFlow>
-
-            {/* Legend */}
-            <div className="absolute left-4 bottom-4 p-2.5 rounded-lg border border-indigo-500/10 bg-[#0e0e16]/90 pointer-events-none text-[10px] space-y-1 z-10 text-gray-400">
-              {[['bg-indigo-500','In Progress'],['bg-emerald-500','Completed'],['bg-rose-500','Blocked'],['bg-gray-600','Pending']].map(([color, label]) => (
-                <div key={label} className="flex items-center gap-1.5"><span className={`h-2 w-2 rounded-full ${color}`} />{label}</div>
-              ))}
-            </div>
           </div>
         )}
 
-        {/* Detail Drawer */}
+        {/* ── DRAWER (PREMIUM DESIGN) ── */}
         {isDrawerOpen && activeNode && (
-          <div className="fixed top-0 right-0 h-screen w-[420px] z-50 border-l border-indigo-500/10 bg-[#0d0d14]/97 shadow-[-20px_0_60px_rgba(0,0,0,0.7)] backdrop-blur-md flex flex-col text-left">
-
-            {/* Drawer header */}
-            <div className="p-5 border-b border-indigo-500/5 flex items-center justify-between shrink-0">
+          <div style={{
+            position: 'fixed', top: 0, right: 0, width: 440, height: '100vh', zIndex: 100,
+            background: T.surface, borderLeft: `1px solid ${T.border}`, boxShadow: T.shadowMd,
+            display: 'flex', flexDirection: 'column', animation: 'slideIn 0.3s ease-out'
+          }}>
+            {/* Header */}
+            <div style={{ padding: '24px 24px 20px', borderBottom: `1px solid ${T.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexShrink: 0, background: T.surface2 }}>
               <div>
-                <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider">Branch Detail</p>
-                <p className="text-sm font-bold text-white mt-0.5 truncate max-w-[300px]">{activeNode.title}</p>
+                <p style={{ fontSize: 10, fontWeight: 800, color: T.brandLight, textTransform: 'uppercase', letterSpacing: '0.1em', margin: '0 0 6px' }}>Branch Detail</p>
+                <h3 style={{ fontSize: 18, fontWeight: 800, color: T.text1, margin: 0, lineHeight: 1.3 }}>{activeNode.title}</h3>
               </div>
-              <button onClick={() => { setIsDrawerOpen(false); setSelectedNodeId(null); }} className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-500/5 text-gray-500 hover:text-white transition-all">
-                <X className="h-4 w-4" />
-              </button>
+              <button onClick={() => { setIsDrawerOpen(false); setSelectedNodeId(null); }} style={{ background: T.surface, border: `1px solid ${T.border}`, width: 32, height: 32, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: T.text2 }}><X size={16} /></button>
             </div>
 
-            {/* Scrollable body */}
-            <div className="flex-grow overflow-y-auto p-5 space-y-5">
-
-              {/* Status / Priority */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</label>
-                  <select value={activeNode.status} onChange={e => updateRoadmapNode(activeNode.id, { status: e.target.value })} className="w-full rounded-lg border border-indigo-500/10 bg-[#0a0a0f] px-3 py-2 text-xs text-white focus:border-indigo-500 outline-none cursor-pointer">
+            {/* Body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
+              
+              {/* Properties */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ background: T.surface2, padding: 12, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                  <label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: T.text3, letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>Status</label>
+                  <select value={activeNode.status} onChange={e => updateRoadmapNode(activeNode.id, { status: e.target.value })} style={{ width: '100%', background: 'transparent', border: 'none', fontSize: 13, fontWeight: 700, color: T.text1, outline: 'none', cursor: 'pointer' }}>
                     {['Pending','In Progress','Completed','Blocked'].map(s => <option key={s}>{s}</option>)}
                   </select>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Priority</label>
-                  <select value={activeNode.priority} onChange={e => updateRoadmapNode(activeNode.id, { priority: e.target.value })} className="w-full rounded-lg border border-indigo-500/10 bg-[#0a0a0f] px-3 py-2 text-xs text-white focus:border-indigo-500 outline-none cursor-pointer">
+                <div style={{ background: T.surface2, padding: 12, borderRadius: 10, border: `1px solid ${T.border}` }}>
+                  <label style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', color: T.text3, letterSpacing: '0.1em', display: 'block', marginBottom: 6 }}>Priority</label>
+                  <select value={activeNode.priority} onChange={e => updateRoadmapNode(activeNode.id, { priority: e.target.value })} style={{ width: '100%', background: 'transparent', border: 'none', fontSize: 13, fontWeight: 700, color: T.text1, outline: 'none', cursor: 'pointer' }}>
                     {['Low','Medium','High'].map(p => <option key={p}>{p}</option>)}
                   </select>
                 </div>
@@ -420,143 +410,69 @@ const Roadmap = () => {
 
               {/* Summary */}
               {activeNode.recommendations && (
-                <div className="rounded-lg bg-indigo-500/5 border border-indigo-500/10 p-3">
-                  <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">AI Summary</p>
-                  <p className="text-xs text-gray-300 leading-relaxed">{activeNode.recommendations}</p>
+                <div style={{ background: T.brandBg, border: `1px solid ${T.brandBdr}`, borderRadius: 12, padding: 16 }}>
+                  <p style={{ fontSize: 10, fontWeight: 800, color: T.brandLight, textTransform: 'uppercase', margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 6 }}><Sparkles size={12} /> AI Insight</p>
+                  <p style={{ fontSize: 13, color: T.text1, margin: 0, lineHeight: 1.6 }}>{activeNode.recommendations}</p>
                 </div>
               )}
 
-              {/* Tasks from backend — rich display */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between border-b border-indigo-500/5 pb-2">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Tasks ({activeNode.tasks?.length || 0})</span>
-                  <span className="text-[10px] text-indigo-400 font-mono">{activeNode.tasks?.filter(t => t.completed).length || 0} / {activeNode.tasks?.length || 0} done</span>
+              {/* Tasks */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: T.text1 }}>Action Items</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: T.brandLight }}>{activeNode.tasks?.filter(t=>t.completed).length || 0} / {activeNode.tasks?.length || 0}</span>
                 </div>
 
-                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                  {activeNode.tasks?.length > 0 ? activeNode.tasks.map(t => {
-                    const isBlocked = t.status === 'Blocked' || t.depStatus === 'Blocked';
-                    return (
-                      <div key={t.id} className="rounded-lg border border-indigo-500/5 bg-[#0a0a0f] overflow-hidden">
-                        {/* Task row */}
-                        <div className="flex items-start gap-2.5 p-2.5">
-                          <input type="checkbox" checked={t.completed} onChange={() => manageSubTask(selectedNodeId, 'toggle', { id: t.id })} className="mt-0.5 h-3.5 w-3.5 rounded border-indigo-500/30 text-indigo-600 cursor-pointer shrink-0" />
-                          <div className="flex-grow min-w-0 text-left">
-                            <p className={`text-xs leading-relaxed ${t.completed ? 'text-gray-500 line-through' : 'text-gray-200'}`}>{t.text}</p>
-                            
-                            {/* Rich metadata from backend */}
-                            <div className="flex flex-wrap gap-1.5 mt-1.5">
-                              {t.assignedTo && t.assignedTo !== 'Unassigned' && (
-                                <span className="flex items-center gap-1 rounded bg-indigo-950 border border-indigo-500/20 px-1.5 py-0.5 text-[9px] font-bold text-indigo-300">
-                                  <User className="h-2.5 w-2.5" />
-                                  {t.assignedTo}
-                                  {t.assigneeRole && <span className="text-[8px] text-indigo-400 font-medium">({t.assigneeRole})</span>}
-                                </span>
-                              )}
-                              {t.priority && (
-                                <span className={`rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase ${t.priority === 'High' ? 'bg-rose-950 border-rose-500/20 text-rose-300' : t.priority === 'Medium' ? 'bg-amber-950 border-amber-500/20 text-amber-300' : 'bg-slate-900 border-slate-500/20 text-slate-300'}`}>
-                                  {t.priority}
-                                </span>
-                              )}
-                              {t.complexity && (
-                                <span className="rounded bg-cyan-950 border border-cyan-500/20 px-1.5 py-0.5 text-[9px] font-bold text-cyan-300">
-                                  {t.complexity} Complexity
-                                </span>
-                              )}
-                              {t.costImpact && t.costImpact !== 'None' && (
-                                <span className="rounded bg-purple-950 border border-purple-500/20 px-1.5 py-0.5 text-[9px] font-bold text-purple-300">
-                                  {t.costImpact} Cost
-                                </span>
-                              )}
-                              {t.depStatus && (
-                                <span className={`flex items-center gap-1 text-[9px] font-bold ${depStatusColor(t.depStatus)}`}>
-                                  {isBlocked ? <Lock className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
-                                  {t.depStatus}
-                                </span>
-                              )}
-                            </div>
-
-                            {/* Blocking dependencies list */}
-                            {isBlocked && t.blockedBy && t.blockedBy.length > 0 && (
-                              <div className="mt-2 text-[9px] font-medium text-rose-400 bg-rose-950/10 border border-rose-500/10 px-2 py-1 rounded flex items-center gap-1">
-                                <span>⚠️ Blocked by:</span>
-                                <span className="truncate max-w-[200px]" title={t.blockedBy.join(', ')}>
-                                  {t.blockedBy.map(bId => bId.replace(/^.*?_task_/, 'Task ')).join(', ')}
-                                </span>
-                              </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {activeNode.tasks?.map(t => (
+                    <div key={t.id} style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 12, padding: 14, boxShadow: T.shadow }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <input type="checkbox" checked={t.completed} onChange={() => manageSubTask(selectedNodeId, 'toggle', { id: t.id })} style={{ marginTop: 3, width: 16, height: 16, cursor: 'pointer', accentColor: T.brand }} />
+                        <div style={{ flex: 1 }}>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: t.completed ? T.text3 : T.text1, textDecoration: t.completed ? 'line-through' : 'none', margin: '0 0 8px', lineHeight: 1.4 }}>{t.text}</p>
+                          
+                          {/* Rich Metadata Pills */}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {t.assignedTo && t.assignedTo !== 'Unassigned' && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4, background: T.purpleBg, border: `1px solid ${T.purpleBdr}`, color: T.purple, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6 }}>
+                                <User size={10} /> {t.assignedTo}
+                              </span>
                             )}
-
-                            {/* Description expand */}
-                            {t.description && (
-                              <button onClick={() => setExpandedTaskId(expandedTaskId === t.id ? null : t.id)} className="flex items-center gap-1 text-[9px] text-gray-600 hover:text-indigo-400 mt-1 transition-colors">
-                                {expandedTaskId === t.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                                {expandedTaskId === t.id ? 'Hide' : 'Details'}
-                              </button>
+                            {t.complexity && (
+                              <span style={{ background: T.surface2, border: `1px solid ${T.border2}`, color: T.text2, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6 }}>
+                                <Activity size={10} style={{ verticalAlign: 'middle', marginRight: 2 }} /> {t.complexity}
+                              </span>
                             )}
-                            {expandedTaskId === t.id && t.description && (
-                              <p className="text-[10px] text-gray-400 mt-1.5 leading-relaxed border-t border-indigo-500/5 pt-1.5">{t.description}</p>
+                            {t.costImpact && t.costImpact !== 'None' && (
+                              <span style={{ background: T.warningBg, border: `1px solid ${T.warningBdr}`, color: T.warning, fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 6 }}>
+                                {t.costImpact} Cost
+                              </span>
                             )}
                           </div>
-                          <button onClick={() => manageSubTask(selectedNodeId, 'delete', { id: t.id })} className="text-gray-600 hover:text-rose-400 shrink-0 p-0.5">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          
+                          {t.description && (
+                            <div style={{ marginTop: 8 }}>
+                              <p style={{ fontSize: 11, color: T.text2, margin: 0, lineHeight: 1.5 }}>{t.description}</p>
+                            </div>
+                          )}
                         </div>
+                        <button onClick={() => manageSubTask(selectedNodeId, 'delete', { id: t.id })} style={{ background: 'none', border: 'none', color: T.text3, cursor: 'pointer' }}><Trash2 size={14} /></button>
                       </div>
-                    );
-                  }) : (
-                    <p className="text-xs text-gray-600 italic py-2">No tasks. Add one below.</p>
-                  )}
-                </div>
-
-                <form onSubmit={handleAddTask} className="flex gap-2">
-                  <input value={newTaskText} onChange={e => setNewTaskText(e.target.value)} placeholder="Add a task..." className="flex-grow rounded-lg border border-indigo-500/10 bg-[#0a0a0f] px-3 py-2 text-xs text-white focus:border-indigo-500 outline-none" />
-                  <button type="submit" className="h-8 w-8 flex items-center justify-center rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shrink-0">
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </form>
-              </div>
-
-              {/* Notes */}
-              <div className="space-y-2">
-                <div className="border-b border-indigo-500/5 pb-2">
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Notes ({activeNode.notes?.length || 0})</span>
-                </div>
-                <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
-                  {activeNode.notes?.length > 0 ? activeNode.notes.map(n => (
-                    <div key={n.id} className="p-2.5 rounded-lg border border-indigo-500/5 bg-[#0a0a0f] relative group">
-                      <button onClick={() => manageNote(selectedNodeId, 'delete', { id: n.id })} className="absolute right-2 top-2 text-gray-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all">
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                      <p className="text-[9px] text-indigo-400 font-mono mb-1">{new Date(n.timestamp).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-                      <p className="text-xs text-gray-300 leading-relaxed pr-4">{n.text}</p>
                     </div>
-                  )) : <p className="text-xs text-gray-600 italic py-2">No notes yet.</p>}
+                  ))}
+                  <form onSubmit={handleAddTask} style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                    <input value={newTaskText} onChange={e => setNewTaskText(e.target.value)} placeholder="Add a new task..." style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface2, color: T.text1, fontSize: 12, outline: 'none' }} />
+                    <button type="submit" style={{ width: 36, height: 36, borderRadius: 8, background: T.brand, color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Plus size={16} /></button>
+                  </form>
                 </div>
-                <form onSubmit={handleAddNote} className="flex gap-2">
-                  <input value={newNoteText} onChange={e => setNewNoteText(e.target.value)} placeholder="Log a note..." className="flex-grow rounded-lg border border-indigo-500/10 bg-[#0a0a0f] px-3 py-2 text-xs text-white focus:border-indigo-500 outline-none" />
-                  <button type="submit" className="h-8 w-8 flex items-center justify-center rounded-lg border border-indigo-500/20 bg-indigo-500/5 text-indigo-400 hover:bg-indigo-600 hover:text-white shrink-0">
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </form>
               </div>
 
-              {/* Add child branch */}
-              <div className="border-t border-indigo-500/5 pt-4 space-y-2">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Add Sub-Branch</span>
-                <form onSubmit={handleAddChild} className="space-y-2">
-                  <input value={childTitle} onChange={e => setChildTitle(e.target.value)} placeholder="Branch Title..." className="w-full rounded-lg border border-indigo-500/10 bg-[#0a0a0f] px-3 py-2 text-xs text-white focus:border-indigo-500 outline-none" />
-                  <input value={childDesc} onChange={e => setChildDesc(e.target.value)} placeholder="Description (optional)..." className="w-full rounded-lg border border-indigo-500/10 bg-[#0a0a0f] px-3 py-2 text-xs text-white focus:border-indigo-500 outline-none" />
-                  <button type="submit" className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-indigo-500/20 bg-indigo-500/5 px-4 py-2 text-xs font-bold uppercase text-indigo-400 hover:bg-indigo-500 hover:text-white transition-all">
-                    <PlusCircle className="h-3.5 w-3.5" />Create Sub-Branch
-                  </button>
-                </form>
-              </div>
             </div>
 
-            {/* Drawer footer */}
-            <div className="p-5 border-t border-indigo-500/5 shrink-0">
-              <button onClick={handleDeleteNode} disabled={activeNode.id === 'root'} className="w-full flex items-center justify-center gap-1.5 rounded-lg border border-transparent bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white py-2.5 text-xs font-bold uppercase disabled:opacity-20 disabled:pointer-events-none transition-all">
-                <Trash2 className="h-3.5 w-3.5" />Delete Branch
+            {/* Footer */}
+            <div style={{ padding: 20, borderTop: `1px solid ${T.border}`, background: T.surface }}>
+              <button onClick={handleDeleteNode} disabled={activeNode.id === 'root'} style={{ width: '100%', padding: '12px', borderRadius: 10, background: T.dangerBg, border: `1px solid ${T.dangerBdr}`, color: T.danger, fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: activeNode.id === 'root' ? 0.4 : 1 }}>
+                <Trash2 size={14} /> Delete Branch
               </button>
             </div>
           </div>

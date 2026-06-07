@@ -2,6 +2,7 @@ from typing import Dict
 from schema.states.graph_state import GraphState
 from services.vector.indexer import index_agent_results
 
+## importing Agents only s
 from agents.query_agents.market_agent import market_agent
 from agents.query_agents.competitor_agent import competitor_agent
 from agents.query_agents.founder_agent import founder_agent
@@ -10,18 +11,31 @@ from agents.query_agents.trend_agent import trend_agent
 from agents.query_agents.problem_agent import problem_agent
 from agents.query_agents.technology_agent import technology_agent
 
-
+# Query Node
 def _make_query_node(agent):
     async def node(state: GraphState) -> Dict:
+        """
+        This is Atomic Node function only check the model status
+        """
+                
+        # Collect the pitch from the states
         pitch = state["pitch"]
+        
+        # Collect the startup raw data in the further process 
         data  = state["startup_data"].model_dump()
+        
         print(f"[Node:{agent.name}] Running...")
+        
         try:
+            # the real agent runs here 
             result  = await agent.run(pitch, data)
+            
+            ## Checking of the output
             queries = result.get("queries", [])
             hits    = result.get("results", [])
             print(f"[Node:{agent.name}] queries={queries}")
             if hits:
+                # Indexing the results
                 stats = index_agent_results(agent.name, data["startup_name"], hits)
                 print(f"[Node:{agent.name}] indexed={stats['added']} dupes={stats['skipped_duplicates']}")
             else:
@@ -35,7 +49,7 @@ def _make_query_node(agent):
     node.__name__ = f"{agent.name}_node"
     return node
 
-
+# THe agent call here
 market_node      = _make_query_node(market_agent)
 competitor_node  = _make_query_node(competitor_agent)
 founder_node     = _make_query_node(founder_agent)
