@@ -157,8 +157,6 @@ const StartupInput = () => {
             {analysisScores && (
               <button
                 onClick={() => {
-                  // Direct to dashboard, mark isLoggedIn = true since they completed validation
-                  localStorage.setItem('isLoggedIn', 'true');
                   navigate('/dashboard');
                 }}
                 className="flex items-center gap-2 rounded-xl border border-cyan-500/20 bg-cyan-950/20 px-6 py-3 text-sm font-bold text-cyan-300 hover:bg-cyan-500/20 hover:text-white transition-all duration-300 animate-bounce mt-2 shadow-[0_0_20px_rgba(34,211,238,0.15)]"

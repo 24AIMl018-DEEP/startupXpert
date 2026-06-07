@@ -13,47 +13,19 @@ export const useStartup = () => {
   return context;
 };
 
-// Migration utility helper for localStorage legacy keys to scoped keys
-const migrateLegacyData = (email) => {
-  if (!email) return;
-  const keys = ['startup_history', 'startup_roadmap', 'validation_session_id', 'startup_draft'];
-  keys.forEach(key => {
-    const legacyValue = localStorage.getItem(key);
-    const scopedKey = `${key}_${email}`;
-    const scopedValue = localStorage.getItem(scopedKey);
-    if (legacyValue && !scopedValue) {
-      localStorage.setItem(scopedKey, legacyValue);
-      console.log(`Migrated legacy key: ${key} to ${scopedKey}`);
-    }
-  });
-};
-
 export const StartupProvider = ({ children }) => {
   const { showToast } = useToast();
 
-  // 1. Authentication & User Profile States (persisted under startup_user & startupxpert_user)
+  // 1. Auth state — restored from localStorage on refresh (auth only, not logic)
   const [user, setUser] = useState(() => {
     const savedUser = localStorage.getItem('startup_user') || localStorage.getItem('startupxpert_user');
     const parsed = savedUser ? JSON.parse(savedUser) : null;
     if (parsed) {
-      if (parsed.email) {
-        migrateLegacyData(parsed.email);
-      }
-      if (parsed.onboardingCompleted === undefined) {
-        const savedHistory = localStorage.getItem(`startup_history_${parsed.email}`) || localStorage.getItem('startup_history');
-        const hasHistory = savedHistory ? JSON.parse(savedHistory).length > 0 : false;
-        parsed.onboardingCompleted = hasHistory;
-      }
+      // onboardingCompleted is determined by DB on login — default false here
+      // Login.jsx sets it after DB check
       return parsed;
     }
-    return {
-      fullName: '',
-      email: '',
-      role: 'Founder',
-      avatarUrl: '', // simulated avatar base64 or URL
-      isNewUser: false,
-      onboardingCompleted: false
-    };
+    return { fullName: '', email: '', role: 'Founder', avatarUrl: '', isNewUser: false, onboardingCompleted: false };
   });
 
   const [isLoggedIn, setIsLoggedIn] = useState(() => {
@@ -72,50 +44,10 @@ export const StartupProvider = ({ children }) => {
     };
   });
 
-  // Roadmap State — empty by default, populated only when user generates from backend
-  const [roadmapNodes, setRoadmapNodes] = useState(() => {
-    const savedUser = localStorage.getItem('startup_user') || localStorage.getItem('startupxpert_user');
-    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
-    if (parsedUser && parsedUser.email) {
-      migrateLegacyData(parsedUser.email);
-      const saved = localStorage.getItem(`startup_roadmap_${parsedUser.email}`);
-      return saved ? JSON.parse(saved) : [];
-    }
-    return [];
-  });
-  const [roadmapData, setRoadmapData]   = useState(() => {
-    // Restore full roadmap backend response from localStorage on mount
-    const savedUser = localStorage.getItem('startup_user') || localStorage.getItem('startupxpert_user');
-    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
-    if (parsedUser?.email) {
-      const saved = localStorage.getItem(`startup_roadmap_data_${parsedUser.email}`);
-      return saved ? JSON.parse(saved) : null;
-    }
-    return null;
-  });  // full backend roadmap response
+  // Roadmap State — always fetched from DB, never localStorage
+  const [roadmapNodes, setRoadmapNodes] = useState([]);
+  const [roadmapData, setRoadmapData]   = useState(null);
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
-
-  // Auto-save roadmap to localStorage
-  useEffect(() => {
-    if (user?.email) {
-      if (roadmapNodes.length > 0) {
-        localStorage.setItem(`startup_roadmap_${user.email}`, JSON.stringify(roadmapNodes));
-      } else {
-        localStorage.removeItem(`startup_roadmap_${user.email}`);
-      }
-    }
-  }, [roadmapNodes, user?.email]);
-
-  // Auto-save full roadmap data response to localStorage
-  useEffect(() => {
-    if (user?.email) {
-      if (roadmapData) {
-        localStorage.setItem(`startup_roadmap_data_${user.email}`, JSON.stringify(roadmapData));
-      } else {
-        localStorage.removeItem(`startup_roadmap_data_${user.email}`);
-      }
-    }
-  }, [roadmapData, user?.email]);
 
   // 3. Onboarding Role Setup (Step 1)
   const [onboardingRole, setOnboardingRole] = useState({
@@ -156,49 +88,34 @@ export const StartupProvider = ({ children }) => {
   const [fullAnalysisData, setFullAnalysisData] = useState(null); // complete backend response
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // 6. Upgraded System States & History
-  const [analysisHistory, setAnalysisHistory] = useState(() => {
-    const savedUser = localStorage.getItem('startup_user') || localStorage.getItem('startupxpert_user');
-    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
-    if (parsedUser && parsedUser.email) {
-      migrateLegacyData(parsedUser.email);
-      const savedHistory = localStorage.getItem(`startup_history_${parsedUser.email}`);
-      return savedHistory ? JSON.parse(savedHistory) : [];
-    }
-    return [];
-  });
+  // 6. History — loaded from DB after login, never from localStorage
+  const [analysisHistory, setAnalysisHistory] = useState([]);
 
   const [loadingState, setLoadingState] = useState(false);
   const [errorState, setErrorState] = useState(null);
   const [currentStep, setCurrentStep] = useState(0); // Onboarding index (0 to 16)
   const [resumeState, setResumeState] = useState(false);
 
-  // Check draft presence on mount
+  // Check draft presence on mount (draft = only localStorage use)
   useEffect(() => {
     const savedUser = localStorage.getItem('startup_user') || localStorage.getItem('startupxpert_user');
     const parsedUser = savedUser ? JSON.parse(savedUser) : null;
-    if (parsedUser && parsedUser.email) {
-      migrateLegacyData(parsedUser.email);
+    if (parsedUser?.email) {
       const savedDraft = localStorage.getItem(`startup_draft_${parsedUser.email}`);
-      if (savedDraft) {
-        setResumeState(true);
-      }
+      if (savedDraft) setResumeState(true);
     }
   }, []);
 
-  // Synchronize user-specific state when user logs in/switches/logs out
+  // When user changes — reset state (DB will reload as needed)
   useEffect(() => {
-    if (user && user.email) {
-      migrateLegacyData(user.email);
-
-      const savedHistory = localStorage.getItem(`startup_history_${user.email}`);
-      setAnalysisHistory(savedHistory ? JSON.parse(savedHistory) : []);
-
-      const savedRoadmap = localStorage.getItem(`startup_roadmap_${user.email}`);
-      setRoadmapNodes(savedRoadmap ? JSON.parse(savedRoadmap) : []);
-
+    if (user?.email) {
+      // Only draft check from localStorage — everything else from DB
       const savedDraft = localStorage.getItem(`startup_draft_${user.email}`);
       setResumeState(!!savedDraft);
+      // Reset roadmap/history — will be loaded from DB on demand
+      setRoadmapNodes([]);
+      setRoadmapData(null);
+      setAnalysisHistory([]);
     } else {
       setAnalysisHistory([]);
       setRoadmapNodes([]);
@@ -208,44 +125,33 @@ export const StartupProvider = ({ children }) => {
 
   // Synchronous State Commit
   const loginUser = (email, password, name = 'Innovator', supabaseUserId = null) => {
-    migrateLegacyData(email);
-    const savedHistory = localStorage.getItem(`startup_history_${email}`);
-    const hasHistory = savedHistory ? JSON.parse(savedHistory).length > 0 : false;
-
-    // Check if onboarding was previously completed for this email
-    const prevSavedUser = localStorage.getItem(`startup_user_${email}`) || localStorage.getItem('startup_user');
+    const prevSavedUser = localStorage.getItem('startup_user');
     const prevUser = prevSavedUser ? JSON.parse(prevSavedUser) : null;
-    const wasOnboardingCompleted =
-      (prevUser && prevUser.email === email && prevUser.onboardingCompleted === true) ||
-      hasHistory;
 
     const activeUser = {
-      fullName:           name,
-      email:              email,
-      userId:             supabaseUserId || prevUser?.userId || null,  // store Supabase UUID
-      role:               'Founder',
-      avatarUrl:          prevUser?.avatarUrl || '',
-      isNewUser:          !wasOnboardingCompleted,
-      onboardingCompleted: wasOnboardingCompleted,
+      fullName:            name,
+      email:               email,
+      userId:              supabaseUserId || prevUser?.userId || null,
+      role:                'Founder',
+      avatarUrl:           prevUser?.avatarUrl || '',
+      isNewUser:           false,  // will be set by DB check in Login.jsx
+      onboardingCompleted: false,  // will be set by DB check in Login.jsx
     };
     setUser(activeUser);
     setIsLoggedIn(true);
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('startup_user', JSON.stringify(activeUser));
     localStorage.setItem('startupxpert_user', JSON.stringify(activeUser));
-    localStorage.setItem(`startup_user_${email}`, JSON.stringify(activeUser));
   };
 
   const registerUser = (fullName, email, role, supabaseUserId = null) => {
-    migrateLegacyData(email);
     const activeUser = {
-      fullName,
-      email,
-      userId:             supabaseUserId,   // store Supabase UUID from registration
+      fullName, email,
+      userId:              supabaseUserId,
       role,
-      avatarUrl:          '',
-      isNewUser:          true,
-      onboardingCompleted: false,           // new user must complete onboarding
+      avatarUrl:           '',
+      isNewUser:           true,
+      onboardingCompleted: false,
     };
     setUser(activeUser);
     setIsLoggedIn(true);
@@ -253,63 +159,26 @@ export const StartupProvider = ({ children }) => {
     localStorage.setItem('isLoggedIn', 'true');
     localStorage.setItem('startup_user', JSON.stringify(activeUser));
     localStorage.setItem('startupxpert_user', JSON.stringify(activeUser));
-    localStorage.setItem(`startup_user_${email}`, JSON.stringify(activeUser));
   };
 
 
   const logoutUser = () => {
     setIsLoggedIn(false);
-
-    // Purge localStorage keys explicitly as requested
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('startup_user');
     localStorage.removeItem('startupxpert_user');
-    localStorage.removeItem('startup_roadmap');
+    // Clear draft on logout
     if (user?.email) {
-      localStorage.removeItem(`startup_roadmap_data_${user.email}`);
+      localStorage.removeItem(`startup_draft_${user.email}`);
     }
-
-    // Reset roadmap
     setRoadmapNodes([]);
     setRoadmapData(null);
-
-    // Clear onboarding states
-    setOnboardingRole({
-      fullName: '',
-      age: '',
-      gender: '',
-      city: '',
-      country: '',
-      profession: '',
-      experience: '',
-      founderCount: '',
-      founderSkillset: [],
-    });
-    setStartupDetails({
-      startupName: '',
-      startupDomain: '',
-      problemStatement: '',
-      startupDescription: '',
-      targetAudience: '',
-      geographicMarket: '',
-      existingCompetitors: '',
-      revenueModel: '',
-      estimatedPricing: '',
-      availableFunding: '',
-      monthlyBurnCapacity: '',
-      platformType: [],
-      techComplexity: '',
-      mvpTimeline: '',
-      scalabilityGoal: '',
-      acquisitionStrategy: '',
-      startupStage: '',
-    });
     setAnalysisScores(null);
+    setAnalysisHistory([]);
     setResumeState(false);
-    
-    // Set user to empty at the end to trigger sync and clean states
+    setOnboardingRole({ fullName: '', age: '', gender: '', city: '', country: '', profession: '', experience: '', founderCount: '', founderSkillset: [] });
+    setStartupDetails({ startupName: '', startupDomain: '', problemStatement: '', startupDescription: '', targetAudience: '', geographicMarket: '', existingCompetitors: '', revenueModel: '', estimatedPricing: '', availableFunding: '', monthlyBurnCapacity: '', platformType: [], techComplexity: '', mvpTimeline: '', scalabilityGoal: '', acquisitionStrategy: '', startupStage: '' });
     setUser({ fullName: '', email: '', role: 'Founder', avatarUrl: '' });
-    
     showToast('Logged out successfully.', 'info');
   };
 
@@ -473,10 +342,10 @@ export const StartupProvider = ({ children }) => {
 
   // History & score archiving operations
   const appendHistory = (entry) => {
-    if (!user?.email) return;
+    // History stored in memory only — DB is source of truth
+    // Dashboard loads history from DB via fetchUserSessions
     const updated = [entry, ...analysisHistory];
     setAnalysisHistory(updated);
-    localStorage.setItem(`startup_history_${user.email}`, JSON.stringify(updated));
   };
 
   const saveAnalysis = (scoresToSave) => {
@@ -494,34 +363,28 @@ export const StartupProvider = ({ children }) => {
         startupName: startupDetails.startupName || 'Unnamed Venture',
         startupDetails: { ...startupDetails },
         date: new Date().toLocaleDateString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
+          day: '2-digit', month: 'short', year: 'numeric',
+          hour: '2-digit', minute: '2-digit'
         }),
         scores: activeScores,
-        risk: activeScores.riskLevel?.status || 'Medium',
-        status: activeScores.feasibility?.status || 'High',
+        risk:    activeScores.riskLevel?.status    || 'Medium',
+        status:  activeScores.feasibility?.status  || 'High',
         summary: activeScores.marketDemand?.details || 'Feasibility analysis report compiled.'
       };
 
       appendHistory(newHistoryEntry);
       clearDraft();
 
-      // Update onboarding status to completed — preserve userId
+      // Update auth state — onboardingCompleted flag in localStorage (auth only, not logic)
       setUser(prev => {
         const updated = { ...prev, onboardingCompleted: true, isNewUser: false };
         localStorage.setItem('startup_user', JSON.stringify(updated));
         localStorage.setItem('startupxpert_user', JSON.stringify(updated));
-        if (prev.email) {
-          localStorage.setItem(`startup_user_${prev.email}`, JSON.stringify(updated));
-        }
         return updated;
       });
 
       setLoadingState(false);
-      showToast('Feasibility analysis archived successfully! Onboarding complete.', 'success');
+      showToast('Analysis saved! Onboarding complete.', 'success');
     }, 1000);
   };
 
@@ -652,26 +515,14 @@ export const StartupProvider = ({ children }) => {
   };
 
   const deleteHistoryItem = (id) => {
-    if (!user?.email) return;
-    setLoadingState(true);
-    setTimeout(() => {
-      const updated = analysisHistory.filter((item) => item.id !== id);
-      setAnalysisHistory(updated);
-      localStorage.setItem(`startup_history_${user.email}`, JSON.stringify(updated));
-      setLoadingState(false);
-      showToast('Analysis entry deleted from history.', 'info');
-    }, 600);
+    // Remove from in-memory state only — DB deletion not implemented yet
+    setAnalysisHistory(prev => prev.filter(item => item.id !== id));
+    showToast('Analysis entry removed from view.', 'info');
   };
 
   const clearHistory = () => {
-    if (!user?.email) return;
-    setLoadingState(true);
-    setTimeout(() => {
-      setAnalysisHistory([]);
-      localStorage.removeItem(`startup_history_${user.email}`);
-      setLoadingState(false);
-      showToast('All analysis records cleared.', 'info');
-    }, 800);
+    setAnalysisHistory([]);
+    showToast('All analysis records cleared from view.', 'info');
   };
 
   const runAnalysis = async (startupDetailsArg, onboardingRoleArg) => {
@@ -716,10 +567,7 @@ export const StartupProvider = ({ children }) => {
       };
 
       const result = await submitValidation(payload);
-
-      if (result?.session_id && user?.email) {
-        localStorage.setItem(`validation_session_id_${user.email}`, result.session_id);
-      }
+      // session_id is stored in DB — no localStorage write needed
 
       const ap = result?.analysis_phase_state || {};
       const scores = {
@@ -760,8 +608,6 @@ export const StartupProvider = ({ children }) => {
           const latest = await fetchLatestValidatedSession(user.userId);
           if (latest?.id) {
             sessionId = latest.id;
-            // Keep localStorage in sync
-            localStorage.setItem(`validation_session_id_${user.email}`, sessionId);
             console.log(`[Roadmap] Using latest DB session: ${sessionId} (${latest.startup_name})`);
           }
         } catch (e) {
@@ -779,7 +625,7 @@ export const StartupProvider = ({ children }) => {
       setRoadmapData(result);
       const nodes = _buildRoadmapNodes(result);
       setRoadmapNodes(nodes);
-      localStorage.setItem(`startup_roadmap_${user.email}`, JSON.stringify(nodes));
+      // Do NOT write to localStorage — roadmap lives in DB
       showToast('Roadmap generated successfully!', 'success');
       return result;
     } catch (err) {
@@ -906,6 +752,7 @@ export const StartupProvider = ({ children }) => {
         setStartupInfo,
         runAnalysis,
         setAnalysisScores,
+        setAnalysisHistory,
         saveAnalysis,
         saveDraft,
         restoreDraft,

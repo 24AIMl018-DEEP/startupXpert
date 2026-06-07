@@ -82,10 +82,8 @@ const Login = () => {
 
       // Always check DB — never localStorage — to decide routing
       if (supabaseUserId) {
-        const { hasValidation, sessionId } = await checkUserHasValidation(supabaseUserId);
-        if (hasValidation && sessionId) {
-          // Store session_id for UI display only (not for logic)
-          localStorage.setItem(`validation_session_id_${formData.email}`, sessionId);
+        const { hasValidation } = await checkUserHasValidation(supabaseUserId);
+        if (hasValidation) {
           navigate('/dashboard', { replace: true });
           return;
         }
