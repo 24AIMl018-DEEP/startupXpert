@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useStartup } from '../context/StartupContext';
 import { useToast } from '../context/ToastContext';
+import { fetchUserSessions } from '../services/startupApi';
 import Sidebar from '../components/Sidebar';
 import { 
   Sparkles, 
@@ -36,6 +37,7 @@ const Dashboard = () => {
     analysisScores,
     dashboardStats, 
     analysisHistory,
+    setAnalysisHistory,
     resumeState,
     restoreDraft,
     setAnalysisScores,
@@ -47,6 +49,29 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState(() => {
     return location.state?.activeTab || 'overview';
   });
+
+  // Load history from DB on mount — DB is source of truth
+  useEffect(() => {
+    if (user?.userId) {
+      fetchUserSessions(user.userId).then(sessions => {
+        if (sessions?.length > 0) {
+          // Map DB sessions to display format
+          const mapped = sessions.map(s => ({
+            id:           s.id,
+            startupName:  s.startup_name || 'Unnamed Venture',
+            date:         new Date(s.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
+            summary:      `${s.startup_domain || ''} — Validated`.trim(),
+            status:       'High',
+            risk:         'Medium',
+            scores:       null,         // scores loaded lazily when user clicks item
+            startupDetails: { startupName: s.startup_name, startupDomain: s.startup_domain },
+            sessionId:    s.id,
+          }));
+          setAnalysisHistory(mapped);
+        }
+      }).catch(() => {/* silently fail — history stays empty */});
+    }
+  }, [user?.userId]);
 
   useEffect(() => {
     if (location.state?.activeTab) {
