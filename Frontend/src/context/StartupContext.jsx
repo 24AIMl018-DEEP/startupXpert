@@ -745,31 +745,41 @@ export const StartupProvider = ({ children }) => {
     }
   };
 
-  // Generate Roadmap from backend — only allowed when a validated session exists
+  // Generate Roadmap from backend — always uses latest validated session from DB
   const generateRoadmap = async (team = []) => {
     if (!user?.email) return null;
 
-    // Resolve session_id scoped to this user
-    let sessionId = localStorage.getItem(`validation_session_id_${user.email}`);
-    if (!sessionId) {
-      // Legacy migration
-      const legacyId = localStorage.getItem('validation_session_id');
-      if (legacyId) {
-        localStorage.setItem(`validation_session_id_${user.email}`, legacyId);
-        sessionId = legacyId;
-      }
-    }
-    if (!sessionId) {
-      showToast('Validate your idea first before generating a roadmap.', 'error');
-      return null;
-    }
-
-    // Guard: idea must belong to this user — session_id is set only after successful
-    // validation which already stores the user_id. No extra check needed here since
-    // the session_id key is user-scoped in localStorage.
-
     setIsGeneratingRoadmap(true);
     try {
+      let sessionId = null;
+
+      // Step 1: Try to get the latest validated session from DB using user's Supabase UUID
+      if (user?.userId) {
+        try {
+          const { fetchLatestValidatedSession } = await import('../services/startupApi');
+          const latest = await fetchLatestValidatedSession(user.userId);
+          if (latest?.id) {
+            sessionId = latest.id;
+            // Keep localStorage in sync
+            localStorage.setItem(`validation_session_id_${user.email}`, sessionId);
+            console.log(`[Roadmap] Using latest DB session: ${sessionId} (${latest.startup_name})`);
+          }
+        } catch (e) {
+          console.warn('[Roadmap] DB session fetch failed, falling back to localStorage:', e.message);
+        }
+      }
+
+      // Step 2: Fall back to localStorage if DB fetch failed
+      if (!sessionId) {
+        sessionId = localStorage.getItem(`validation_session_id_${user.email}`)
+          || localStorage.getItem('validation_session_id');
+      }
+
+      if (!sessionId) {
+        showToast('Validate your idea first before generating a roadmap.', 'error');
+        return null;
+      }
+
       const result = await submitRoadmap(sessionId, team);
       setRoadmapData(result);
       const nodes = _buildRoadmapNodes(result);
