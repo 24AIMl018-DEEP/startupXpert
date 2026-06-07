@@ -5,19 +5,16 @@ import Navbar from '../components/Navbar';
 import InputField from '../components/InputField';
 import { Lock, Mail, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { signInUser } from '../services/authService';
-import { fetchLatestSession } from '../services/startupApi';
+import { checkUserHasValidation } from '../services/startupApi';
 
 const Login = () => {
   const { loginUser, isLoggedIn, user, setLoading } = useStartup();
   const navigate = useNavigate();
 
-  // Redirect authenticated sessions immediately (Auth Redirect)
+  // Redirect already-logged-in users
   useEffect(() => {
     if (isLoggedIn && user?.email) {
-      const savedHistory = localStorage.getItem(`startup_history_${user.email}`) || localStorage.getItem('startup_history');
-      const hasHistory = savedHistory ? JSON.parse(savedHistory).length > 0 : false;
-      const wasCompleted = user?.onboardingCompleted === true;
-      navigate((hasHistory || wasCompleted) ? '/dashboard' : '/onboarding/role', { replace: true });
+      navigate('/dashboard', { replace: true });
     }
   }, [isLoggedIn, user?.email, navigate]);
 
@@ -81,34 +78,20 @@ const Login = () => {
         data.user?.user_metadata?.full_name ||
         formData.email.split('@')[0].replace(/^./, (c) => c.toUpperCase());
 
-      // Pass the Supabase UUID so ideas are linked to this account
       loginUser(formData.email, formData.password, fullName, supabaseUserId);
 
-      // Check if user already has a completed validation session in DB
-      // If yes → skip onboarding entirely, restore session_id, go to dashboard
+      // Always check DB — never localStorage — to decide routing
       if (supabaseUserId) {
-        const existingSession = await fetchLatestSession(supabaseUserId);
-        if (existingSession?.id) {
-          // Store session_id scoped to this user so roadmap can use it
-          localStorage.setItem(`validation_session_id_${formData.email}`, existingSession.id);
-          // Mark onboarding as completed
-          const prevUser = localStorage.getItem(`startup_user_${formData.email}`);
-          const parsed = prevUser ? JSON.parse(prevUser) : {};
-          const updated = { ...parsed, onboardingCompleted: true, isNewUser: false };
-          localStorage.setItem(`startup_user_${formData.email}`, JSON.stringify(updated));
-          localStorage.setItem('startup_user', JSON.stringify(updated));
+        const { hasValidation, sessionId } = await checkUserHasValidation(supabaseUserId);
+        if (hasValidation && sessionId) {
+          // Store session_id for UI display only (not for logic)
+          localStorage.setItem(`validation_session_id_${formData.email}`, sessionId);
           navigate('/dashboard', { replace: true });
           return;
         }
       }
-
-      // No existing session — check local history as fallback
-      const savedHistory = localStorage.getItem(`startup_history_${formData.email}`) || localStorage.getItem('startup_history');
-      const hasHistory = savedHistory ? JSON.parse(savedHistory).length > 0 : false;
-      const prevUser = localStorage.getItem(`startup_user_${formData.email}`);
-      const wasCompleted = prevUser ? JSON.parse(prevUser)?.onboardingCompleted === true : false;
-
-      navigate((hasHistory || wasCompleted) ? '/dashboard' : '/onboarding/role');
+      // No validated session in DB → new user, go to onboarding
+      navigate('/onboarding/role');
     } catch (err) {
       setSubmitError(err.message || 'Invalid email or password.');
     } finally {

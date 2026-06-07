@@ -218,19 +218,10 @@ const Roadmap = () => {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   const handleGenerateClick = () => {
-    // Gate: must have a validated session for this user
-    const sessionKey = user?.email
-      ? `validation_session_id_${user.email}`
-      : 'validation_session_id';
-    const hasSession =
-      localStorage.getItem(sessionKey) ||
-      localStorage.getItem('validation_session_id');
-
-    if (!hasSession) {
-      showToast(
-        'Validate an idea first — roadmap generation requires a completed validation.',
-        'error'
-      );
+    // Gate: must have a validated session — check via user.userId (DB-backed)
+    // roadmapNodes check: if user has roadmap nodes loaded, they came from DB already
+    if (!user?.userId) {
+      showToast('Please log in again to continue.', 'error');
       return;
     }
     setShowTeamModal(true);
@@ -308,11 +299,8 @@ const Roadmap = () => {
 
         {/* Empty State — two variants: no validation vs validated but no roadmap */}
         {roadmapNodes.length === 0 && !isGeneratingRoadmap && (() => {
-          const sessionKey = user?.email
-            ? `validation_session_id_${user.email}`
-            : 'validation_session_id';
-          const hasValidatedSession =
-            !!(localStorage.getItem(sessionKey) || localStorage.getItem('validation_session_id'));
+          // Use user.userId presence as proxy for "has validated" — actual check happens in generateRoadmap
+          const hasValidatedSession = !!user?.userId;
 
           if (!hasValidatedSession) {
             // No validated idea at all

@@ -769,14 +769,9 @@ export const StartupProvider = ({ children }) => {
         }
       }
 
-      // Step 2: Fall back to localStorage if DB fetch failed
+      // Step 2: Fall back — if DB unavailable, show error (no localStorage fallback for logic)
       if (!sessionId) {
-        sessionId = localStorage.getItem(`validation_session_id_${user.email}`)
-          || localStorage.getItem('validation_session_id');
-      }
-
-      if (!sessionId) {
-        showToast('Validate your idea first before generating a roadmap.', 'error');
+        showToast('Could not find your validation session. Please validate your idea first.', 'error');
         return null;
       }
 

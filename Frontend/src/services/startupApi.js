@@ -24,28 +24,48 @@ export async function submitValidation(startupPayload) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || `Validation API error: ${res.status}`);
   }
-  return res.json(); // returns PipelineState with session_id
-}
-
-// Fetch all sessions belonging to a user (validation module)
-export async function fetchUserSessions(userId) {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`${VALIDATION_URL}/api/v1/sessions/${userId}`, { headers });
-  if (!res.ok) return [];
   return res.json();
 }
 
-// Check if user already has a completed validation session (used on login to skip onboarding)
-export async function fetchLatestSession(userId) {
+// ── DB as source of truth — no localStorage for logic ────────────────────────
+
+// Check if user has completed validation + get their latest session_id
+// Use this instead of localStorage to determine onboarding/routing
+export async function checkUserHasValidation(userId) {
+  if (!userId) return { hasValidation: false, sessionId: null, startupName: null };
   const headers = await getAuthHeaders();
   try {
     const res = await fetch(`${VALIDATION_URL}/api/v1/sessions/${userId}/latest`, { headers });
-    if (!res.ok) return null;
+    if (!res.ok) return { hasValidation: false, sessionId: null, startupName: null };
     const data = await res.json();
-    return data.found ? data.session : null;
+    return {
+      hasValidation: data.found === true,
+      sessionId:     data.session?.id || null,
+      startupName:   data.session?.startup_name || null,
+      score:         data.session?.aggregate_validation_score || null,
+    };
   } catch {
-    return null;
+    return { hasValidation: false, sessionId: null, startupName: null };
   }
+}
+
+// Fetch all sessions for a user (for dashboard history display)
+export async function fetchUserSessions(userId) {
+  if (!userId) return [];
+  const headers = await getAuthHeaders();
+  try {
+    const res = await fetch(`${VALIDATION_URL}/api/v1/sessions/${userId}`, { headers });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
+}
+
+// Get latest validated session from validation module (for login redirect)
+export async function fetchLatestSession(userId) {
+  const r = await checkUserHasValidation(userId);
+  return r.hasValidation ? { id: r.sessionId, startup_name: r.startupName } : null;
 }
 
 // ── Roadmap Module ────────────────────────────────────────────────────────────
@@ -61,27 +81,25 @@ export async function submitRoadmap(sessionId, team = []) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.detail || `Roadmap API error: ${res.status}`);
   }
-  return res.json(); // returns RoadmapPipelineState
+  return res.json();
 }
 
 // Fetch saved roadmap for a session from DB
 export async function fetchSessionRoadmap(sessionId) {
+  if (!sessionId) return null;
   const headers = await getAuthHeaders();
-  const res = await fetch(`${ROADMAP_URL}/api/v1/roadmap/${sessionId}`, { headers });
-  if (!res.ok) return null;
-  return res.json();
+  try {
+    const res = await fetch(`${ROADMAP_URL}/api/v1/roadmap/${sessionId}`, { headers });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
 }
 
-// Fetch all user sessions with validation status (roadmap module)
-export async function fetchValidatedSessions(userId) {
-  const headers = await getAuthHeaders();
-  const res = await fetch(`${ROADMAP_URL}/api/v1/sessions/${userId}`, { headers });
-  if (!res.ok) return [];
-  return res.json();
-}
-
-// Get latest validated session from roadmap module DB
+// Get latest validated session from roadmap module DB (DB source of truth for roadmap)
 export async function fetchLatestValidatedSession(userId) {
+  if (!userId) return null;
   const headers = await getAuthHeaders();
   try {
     const res = await fetch(`${ROADMAP_URL}/api/v1/sessions/${userId}/latest`, { headers });
@@ -90,6 +108,19 @@ export async function fetchLatestValidatedSession(userId) {
     return data.found ? data.session : null;
   } catch {
     return null;
+  }
+}
+
+// Fetch all validated sessions (for dashboard list)
+export async function fetchValidatedSessions(userId) {
+  if (!userId) return [];
+  const headers = await getAuthHeaders();
+  try {
+    const res = await fetch(`${ROADMAP_URL}/api/v1/sessions/${userId}`, { headers });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
   }
 }
 
@@ -122,4 +153,3 @@ export async function patchTask(taskId, fields) {
   }
   return res.json();
 }
-
