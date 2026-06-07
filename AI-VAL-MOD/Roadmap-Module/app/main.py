@@ -38,7 +38,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Startup Roadmap Generator", version="2.0.0")
-
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 if "*" in ALLOWED_ORIGINS:
     app.add_middleware(
