@@ -121,7 +121,13 @@ def _is_quota_exhausted(err: Exception) -> bool:
 
 def call_llm_with_fallback(prompt: str, tier: int, temperature: float = None) -> str:
     temp = temperature if temperature is not None else Config.DEFAULT_TEMPERATURE
-    tiers_to_try = list(dict.fromkeys([tier] + list(range(tier - 1, 0, -1))))
+    # Always try requested tier first, then fall back upward (2→3) if tier=1 fails,
+    # or downward (3→2→1) if a higher tier fails. Ollama (tier 1) is last resort.
+    if tier == 1:
+        # On production Ollama won't be available — go up to Groq, then NVIDIA
+        tiers_to_try = list(dict.fromkeys([1, 2, 3]))
+    else:
+        tiers_to_try = list(dict.fromkeys([tier] + list(range(tier - 1, 0, -1))))
 
     last_err = None
     for current_tier in tiers_to_try:
@@ -147,9 +153,8 @@ def call_llm_with_fallback(prompt: str, tier: int, temperature: float = None) ->
                 print(f"[LLM] ✗ {_TIER_NAMES.get(current_tier)} error: {str(e)[:120]}")
                 # If daily quota exhausted → skip ALL retries, jump straight to Ollama
                 if _is_quota_exhausted(e):
-                    print(f"[LLM] Daily quota exhausted on {_TIER_NAMES.get(current_tier)} → falling back to Ollama immediately")
-                    tiers_to_try = [1]  # only Ollama remaining
-                    break
+                    print(f"[LLM] Daily quota exhausted on {_TIER_NAMES.get(current_tier)} → skipping retries")
+                    break  # skip retries for this tier, try next in tiers_to_try
                 if not _is_rate_limit(e):
                     break  # non-rate-limit error → skip retries, try next tier
 
