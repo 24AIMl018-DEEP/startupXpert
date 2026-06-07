@@ -1,529 +1,710 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStartup } from '../context/StartupContext';
 import { useToast } from '../context/ToastContext';
 import Navbar from '../components/Navbar';
 import {
   Sparkles, TrendingUp, Target, Users, Gauge, AlertCircle,
-  Zap, Layers, Search, Download, RefreshCw, Save,
-  LayoutDashboard, ShieldAlert,
-  Lightbulb, Swords, ChevronDown, ChevronUp, Sun, Moon,
-  Rocket, Globe, DollarSign, Clock, BarChart2,
-  ArrowRight, Award, Cpu, CheckCircle2, TrendingDown
+  Zap, Layers, Search, Download, Save, ShieldAlert, Lightbulb,
+  Swords, ChevronDown, ChevronUp, Globe, DollarSign, Clock,
+  BarChart2, Award, Cpu, CheckCircle2, XCircle, Rocket,
+  FileText, Database, Activity, ArrowRight, Star, RefreshCw,
+  LayoutDashboard, TrendingDown, BookOpen, Shield
 } from 'lucide-react';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-const ScoreArc = ({ score = 0, size = 72, strokeWidth = 6, color, trackColor }) => {
-  const s = Math.max(0, Math.min(100, score));
-  const r = (size - strokeWidth * 2) / 2;
+const sc = (s) => s >= 70 ? 'var(--green)' : s >= 45 ? 'var(--amber)' : 'var(--red)';
+const vm = (v = '') => {
+  const x = v.toLowerCase();
+  if (x.includes('high') || x.includes('strong') || x.includes('excellent') || x.includes('low risk'))
+    return { color: 'var(--green)', bg: 'var(--green-bg)', border: 'var(--green-border)', cls: 'badge badge-green' };
+  if (x.includes('medium') || x.includes('moderate'))
+    return { color: 'var(--amber)', bg: 'var(--amber-bg)', border: 'var(--amber-border)', cls: 'badge badge-amber' };
+  return   { color: 'var(--red)',   bg: 'var(--red-bg)',   border: 'var(--red-border)',   cls: 'badge badge-red'   };
+};
+
+const gradeOf = (score) => {
+  if (score >= 80) return { letter: 'A', label: 'Excellent',  color: 'var(--green)', bg: 'var(--green-bg)', border: 'var(--green-border)' };
+  if (score >= 65) return { letter: 'B', label: 'Good',       color: 'var(--brand-light)', bg: 'var(--brand-bg)', border: 'var(--brand-border)' };
+  if (score >= 50) return { letter: 'C', label: 'Moderate',   color: 'var(--amber)', bg: 'var(--amber-bg)', border: 'var(--amber-border)' };
+  return              { letter: 'D', label: 'Needs Work', color: 'var(--red)',   bg: 'var(--red-bg)',   border: 'var(--red-border)'   };
+};
+
+// Animated score number
+const AnimatedScore = ({ score, size = 100, stroke = 9 }) => {
+  const [current, setCurrent] = useState(0);
+  const r = (size - stroke * 2) / 2;
   const circ = 2 * Math.PI * r;
-  const offset = circ * (1 - s / 100);
+  useEffect(() => {
+    let s = 0;
+    const step = Math.ceil(score / 40);
+    const id = setInterval(() => {
+      s += step;
+      if (s >= score) { setCurrent(score); clearInterval(id); } else setCurrent(s);
+    }, 30);
+    return () => clearInterval(id);
+  }, [score]);
+  const color = sc(score);
+  const offset = circ * (1 - current / 100);
   return (
     <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)', display: 'block' }}>
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={trackColor} strokeWidth={strokeWidth} />
-        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={strokeWidth}
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="var(--surface3)" strokeWidth={stroke} />
+        <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={stroke}
           strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 1.3s cubic-bezier(.4,0,.2,1)' }} />
+          style={{ transition: 'stroke-dashoffset 0.05s linear' }} />
       </svg>
-      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <span style={{ fontSize: size * 0.22, fontWeight: 900, color, fontFamily: 'inherit' }}>{Math.round(s)}</span>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <span style={{ fontSize: size * 0.24, fontWeight: 900, color, lineHeight: 1, fontFamily: 'var(--font-mono)' }}>{current}</span>
+        <span style={{ fontSize: size * 0.09, color: 'var(--text3)', fontWeight: 600 }}>/100</span>
       </div>
     </div>
   );
 };
 
-const gradeOf = (score) => {
-  if (score >= 80) return { letter: 'A', label: 'Excellent', desc: 'Highly viable. Strong fundamentals across all dimensions.' };
-  if (score >= 65) return { letter: 'B', label: 'Good',      desc: 'Solid potential. A few areas to strengthen before launch.' };
-  if (score >= 50) return { letter: 'C', label: 'Moderate',  desc: 'Mixed signals. Significant improvements needed before scaling.' };
-  return              { letter: 'D', label: 'Needs Work', desc: 'High-risk indicators found. Recommend rethinking core assumptions.' };
+// Mini score bar
+const ScoreBar = ({ score, label }) => (
+  <div>
+    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 4 }}>
+      <span style={{ color: 'var(--text2)', fontWeight: 500 }}>{label}</span>
+      <span style={{ color: sc(score), fontWeight: 700, fontFamily: 'var(--font-mono)' }}>{score}</span>
+    </div>
+    <div className="progress-track" style={{ height: 5 }}>
+      <div className="progress-fill" style={{ width: `${score}%`, height: '100%', background: `linear-gradient(90deg, ${sc(score)}, ${sc(score)}aa)` }} />
+    </div>
+  </div>
+);
+
+// Bullet list
+const BulletList = ({ items, color, max = 5 }) => {
+  if (!items?.length) return <span style={{ fontSize: 12, color: 'var(--text3)', fontStyle: 'italic' }}>No data available</span>;
+  return (
+    <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {items.slice(0, max).map((item, i) => (
+        <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: color, flexShrink: 0, marginTop: 7 }} />
+          {item}
+        </li>
+      ))}
+    </ul>
+  );
 };
 
-// Score color using CSS vars via inline strings — respects both light/dark themes
-const scoreColor = (s) => {
-  if (s >= 70) return 'var(--green)';
-  if (s >= 45) return 'var(--amber)';
-  return 'var(--red)';
+// Tag chips
+const TagChips = ({ items, color, bg, border }) => {
+  if (!items?.length) return null;
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {items.map((item, i) => (
+        <span key={i} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 99, background: bg, border: `1px solid ${border}`, color, fontWeight: 600 }}>
+          {item}
+        </span>
+      ))}
+    </div>
+  );
 };
 
-const verdictMeta = (verdict = '') => {
-  const v = verdict.toLowerCase();
-  if (v.includes('high') || v.includes('strong') || v.includes('pass') || v.includes('excellent') || v.includes('low risk')) {
-    return { color: 'var(--green)', bg: 'var(--green-bg)', border: 'var(--green-border)' };
-  }
-  if (v.includes('medium') || v.includes('moderate')) {
-    return { color: 'var(--amber)', bg: 'var(--amber-bg)', border: 'var(--amber-border)' };
-  }
-  return { color: 'var(--red)', bg: 'var(--red-bg)', border: 'var(--red-border)' };
-};
+// Section header
+const SectionHead = ({ icon: Icon, label, color = 'var(--brand-light)', count }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+    <div style={{ width: 30, height: 30, borderRadius: 8, background: color + '18', border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <Icon size={14} style={{ color }} />
+    </div>
+    <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--text1)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</span>
+    {count !== undefined && (
+      <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 99, background: 'var(--surface3)', color: 'var(--text3)', fontWeight: 700, marginLeft: 'auto' }}>
+        {count}
+      </span>
+    )}
+  </div>
+);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Main Component
-// ─────────────────────────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 const AnalysisResult = () => {
-  const navigate = useNavigate();
+  const navigate   = useNavigate();
   const { showToast } = useToast();
   const { analysisScores, fullAnalysisData, startupDetails, saveAnalysis } = useStartup();
   const [expandedAgent, setExpandedAgent] = useState(null);
-  const [isLight, setIsLight] = useState(false);
-  const wrapperRef = useRef(null);
+  const [activeTab, setActiveTab]         = useState('overview');
 
-  // Apply light-mode class to wrapper div (not body)
-  useEffect(() => {
-    const el = wrapperRef.current;
-    if (!el) return;
-    if (isLight) {
-      el.classList.add('light-mode');
-    } else {
-      el.classList.remove('light-mode');
-    }
-  }, [isLight]);
+  const handleSave = () => { saveAnalysis(analysisScores); setTimeout(() => navigate('/dashboard'), 1200); };
+  const handleExport = () => showToast('PDF export coming in V2.0!', 'info');
 
-  const handleExport    = () => showToast('PDF export coming in V2.0!', 'info');
-  const handleSave      = () => { saveAnalysis(analysisScores); setTimeout(() => navigate('/dashboard'), 1200); };
-  const handleReanalyze = () => { showToast('Re-compiling venture inputs…', 'info'); navigate('/analysis/loader'); };
-
-  // ── Theme token map — CSS vars as default, explicit light overrides ───────
-  const T = {
-    bg:          isLight ? '#f8fafc'                          : 'var(--bg)',
-    surface:     isLight ? '#ffffff'                          : 'var(--surface)',
-    surface2:    isLight ? '#f1f5f9'                          : 'var(--surface2)',
-    surface3:    isLight ? '#e8edf5'                          : 'var(--surface3)',
-    border:      isLight ? '#e2e8f0'                          : 'var(--border)',
-    border2:     isLight ? '#cbd5e1'                          : 'var(--border2)',
-    text1:       isLight ? '#0f172a'                          : 'var(--text1)',
-    text2:       isLight ? '#475569'                          : 'var(--text2)',
-    text3:       isLight ? '#94a3b8'                          : 'var(--text3)',
-    brand:       isLight ? '#2563eb'                          : 'var(--brand)',
-    brandLight:  isLight ? '#2563eb'                          : 'var(--brand-light)',
-    brandBg:     isLight ? '#eff6ff'                          : 'var(--brand-bg)',
-    brandBdr:    isLight ? '#bfdbfe'                          : 'var(--brand-border)',
-    success:     isLight ? '#059669'                          : 'var(--green)',
-    successBg:   isLight ? '#f0fdf4'                          : 'var(--green-bg)',
-    successBdr:  isLight ? '#bbf7d0'                          : 'var(--green-border)',
-    warning:     isLight ? '#d97706'                          : 'var(--amber)',
-    warningBg:   isLight ? '#fffbeb'                          : 'var(--amber-bg)',
-    warningBdr:  isLight ? '#fde68a'                          : 'var(--amber-border)',
-    danger:      isLight ? '#dc2626'                          : 'var(--red)',
-    dangerBg:    isLight ? '#fef2f2'                          : 'var(--red-bg)',
-    dangerBdr:   isLight ? '#fecaca'                          : 'var(--red-border)',
-    purple:      isLight ? '#7c3aed'                          : 'var(--brand)',
-    purpleBg:    isLight ? '#f5f3ff'                          : 'var(--brand-bg)',
-    purpleBdr:   isLight ? '#ede9fe'                          : 'var(--brand-border)',
-    track:       isLight ? '#e2e8f0'                          : 'var(--surface3)',
-    shadow:      isLight ? '0 1px 3px rgba(0,0,0,0.06),0 4px 12px rgba(0,0,0,0.04)'
-                         : 'var(--shadow)',
-    shadowMd:    isLight ? '0 4px 24px rgba(0,0,0,0.07),0 16px 48px rgba(0,0,0,0.04)'
-                         : 'var(--shadow-md)',
-    shadowBrand: isLight ? '0 2px 16px rgba(37,99,235,0.25)'
-                         : 'var(--shadow-brand)',
-  };
-
-  // ── Missing data guard ────────────────────────────────────────────────────
   if (!analysisScores) {
     return (
-      <div ref={wrapperRef} style={{ background: 'var(--bg)', minHeight: '100vh' }}>
+      <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
         <Navbar />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: 16 }}>
           <div style={{ width: 56, height: 56, borderRadius: 14, background: 'var(--red-bg)', border: '1px solid var(--red-border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <AlertCircle size={24} style={{ color: 'var(--red)' }} />
           </div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text1)', margin: 0 }}>Analysis Data Missing</h2>
-          <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0 }}>No analysis results found. Please run a validation first.</p>
-          <button onClick={() => navigate('/startup/validate')} className="btn btn-primary" style={{ marginTop: 8 }}>
-            Go to Validation
-          </button>
+          <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text1)', margin: 0 }}>No Analysis Found</h2>
+          <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0 }}>Please run a validation first.</p>
+          <button onClick={() => navigate('/startup/validate')} className="btn btn-primary" style={{ marginTop: 8 }}>Go to Validation</button>
         </div>
       </div>
     );
   }
 
-  // ── Safe score getter ─────────────────────────────────────────────────────
-  const getScore = (id) => analysisScores?.[id] ?? { score: 0, status: 'N/A', details: 'Data unavailable.' };
+  // ── Derived data ──────────────────────────────────────────────────────────
+  const ap  = fullAnalysisData?.analysis_phase_state || {};
+  const qp  = fullAnalysisData?.query_phase_state    || {};
+  const pp  = fullAnalysisData?.pitch_state          || {};
 
-  const scoreValues = Object.values(analysisScores || {}).filter(s => s != null && typeof s.score === 'number');
-  const overallScore = scoreValues.length > 0
-    ? Math.round(scoreValues.reduce((acc, s) => acc + s.score, 0) / scoreValues.length)
-    : 0;
-  const grade = gradeOf(overallScore);
-  const overallColor = scoreColor(overallScore);
+  const scoreValues = Object.values(analysisScores).filter(s => s && typeof s.score === 'number');
+  const overall     = Math.round(scoreValues.reduce((a, s) => a + s.score, 0) / Math.max(1, scoreValues.length));
+  const grade       = gradeOf(overall);
 
-  const ap = fullAnalysisData?.analysis_phase_state || {};
-
-  const metricMeta = [
-    { id: 'marketDemand',       label: 'Market Demand',        icon: TrendingUp,  desc: 'Addressable demand size and growth trajectory in the target market.' },
-    { id: 'targetAudienceFit',  label: 'Audience Fit',         icon: Target,      desc: 'How precisely the solution maps to real-world user problems and pain points.' },
-    { id: 'problemSolutionFit', label: 'Problem–Solution Fit', icon: Sparkles,    desc: 'Alignment strength between the problem hypothesis and the proposed solution.' },
-    { id: 'competitorPresence', label: 'Competitor Landscape', icon: Users,       desc: 'Density and sophistication of existing players in the market space.' },
-    { id: 'revenuePotential',   label: 'Revenue Potential',    icon: DollarSign,  desc: 'Monetization capacity, pricing power, and revenue model sustainability.' },
-    { id: 'riskLevel',          label: 'Risk Exposure',        icon: ShieldAlert, desc: 'Aggregate of execution, market, regulatory, and technical risk factors.' },
-    { id: 'innovationLevel',    label: 'Innovation Score',     icon: Zap,         desc: 'Differentiation level and novelty compared to existing solutions.' },
-    { id: 'scalability',        label: 'Scalability Index',    icon: Layers,      desc: 'Ability to grow efficiently across geographies, user segments, and channels.' },
-    { id: 'feasibility',        label: 'Feasibility',          icon: Cpu,         desc: 'Technical and operational viability given current constraints and resources.' },
-  ];
+  const fe  = ap.feasibility        || {};
+  const mo  = ap.market_opportunity  || {};
+  const co  = ap.competition         || {};
+  const ri  = ap.risk                || {};
+  const inn = ap.innovation_usp      || {};
 
   const agents = [
-    { key: 'feasibility',        label: 'Feasibility Analysis',   icon: Search,      data: ap.feasibility,        color: T.brandLight, bgColor: T.brandBg, bdrColor: T.brandBdr },
-    { key: 'market_opportunity', label: 'Market Opportunity',      icon: TrendingUp,  data: ap.market_opportunity, color: T.success,    bgColor: T.successBg, bdrColor: T.successBdr },
-    { key: 'competition',        label: 'Competition Analysis',    icon: Swords,      data: ap.competition,        color: T.warning,    bgColor: T.warningBg, bdrColor: T.warningBdr },
-    { key: 'risk',               label: 'Risk Assessment',         icon: ShieldAlert, data: ap.risk,               color: T.danger,     bgColor: T.dangerBg,  bdrColor: T.dangerBdr },
-    { key: 'innovation_usp',     label: 'Innovation & USP',        icon: Lightbulb,   data: ap.innovation_usp,     color: T.purple,     bgColor: T.purpleBg,  bdrColor: T.purpleBdr },
+    { key: 'feasibility',      label: 'Feasibility',     icon: Search,      data: fe,  color: 'var(--brand-light)' },
+    { key: 'market',           label: 'Market',          icon: TrendingUp,  data: mo,  color: 'var(--green)'       },
+    { key: 'competition',      label: 'Competition',     icon: Swords,      data: co,  color: 'var(--amber)'       },
+    { key: 'risk',             label: 'Risk',            icon: ShieldAlert, data: ri,  color: 'var(--red)'         },
+    { key: 'innovation',       label: 'Innovation',      icon: Lightbulb,   data: inn, color: 'var(--cyan)'        },
   ];
 
-  // ── Key Insights — derive 3 top bullets from agent data ──────────────────
-  const keyInsights = (() => {
-    const insights = [];
-    if (ap.market_opportunity?.tam_signal)         insights.push({ icon: TrendingUp,  color: T.success, text: ap.market_opportunity.tam_signal });
-    if (ap.innovation_usp?.usp_statement)          insights.push({ icon: Zap,         color: T.purple,  text: ap.innovation_usp.usp_statement });
-    if (ap.risk?.overall_risk_level)               insights.push({ icon: ShieldAlert, color: T.danger,  text: ap.risk.overall_risk_level });
-    if (ap.feasibility?.summary && insights.length < 3)
-      insights.push({ icon: CheckCircle2, color: T.brandLight, text: ap.feasibility.summary });
-    if (ap.market_opportunity?.timing_assessment && insights.length < 3)
-      insights.push({ icon: Clock, color: T.warning, text: ap.market_opportunity.timing_assessment });
-    return insights.slice(0, 3);
-  })();
+  const metricRows = [
+    { id: 'marketDemand',       label: 'Market Demand',       icon: TrendingUp  },
+    { id: 'targetAudienceFit',  label: 'Audience Fit',        icon: Target      },
+    { id: 'problemSolutionFit', label: 'Problem-Solution',    icon: Sparkles    },
+    { id: 'competitorPresence', label: 'Competitor Landscape',icon: Users       },
+    { id: 'revenuePotential',   label: 'Revenue Potential',   icon: DollarSign  },
+    { id: 'riskLevel',          label: 'Risk Exposure',       icon: ShieldAlert },
+    { id: 'innovationLevel',    label: 'Innovation Score',    icon: Zap         },
+    { id: 'scalability',        label: 'Scalability',         icon: Layers      },
+    { id: 'feasibility',        label: 'Feasibility',         icon: Cpu         },
+  ];
 
-  const renderBullets = (items, dotColor) => {
-    if (!items?.length) return <p style={{ fontSize: 12, color: T.text3, fontStyle: 'italic', margin: 0 }}>No data available.</p>;
-    return (
-      <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 7 }}>
-        {items.map((item, i) => (
-          <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 13, color: T.text2, lineHeight: 1.65 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: dotColor, marginTop: 7, flexShrink: 0 }} />
-            <span>{item}</span>
-          </li>
-        ))}
-      </ul>
-    );
-  };
+  const TABS = [
+    { id: 'overview',    label: 'Overview',    icon: BarChart2  },
+    { id: 'market',      label: 'Market',      icon: TrendingUp },
+    { id: 'competition', label: 'Competition', icon: Swords     },
+    { id: 'risks',       label: 'Risks',       icon: Shield     },
+    { id: 'intelligence',label: 'Intelligence',icon: Database   },
+    { id: 'pitch',       label: 'Pitch',       icon: BookOpen   },
+  ];
 
-  const InsightCard = ({ title, value, color, bg, bdr }) => (
-    <div style={{ padding: '14px 16px', background: bg, border: `1px solid ${bdr}`, borderRadius: 10, minWidth: 0 }}>
-      <p style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color, margin: '0 0 6px' }}>{title}</p>
-      <p style={{ fontSize: 12.5, color: T.text2, margin: 0, lineHeight: 1.65 }}>{value}</p>
-    </div>
-  );
-
-  const SectionHeader = ({ label, sub }) => (
-    <div style={{ marginBottom: 18 }}>
-      <h2 style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.12em', color: T.brandLight, margin: '0 0 4px' }}>{label}</h2>
-      {sub && <p style={{ fontSize: 13, color: T.text2, margin: 0, lineHeight: 1.6 }}>{sub}</p>}
-    </div>
-  );
-
-  const ListBlock = ({ title, items, color }) => {
-    if (!items?.length) return null;
-    return (
-      <div>
-        <p style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color, margin: '0 0 10px' }}>✦ {title}</p>
-        {renderBullets(items, color)}
-      </div>
-    );
-  };
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────────────────
   return (
-    <div ref={wrapperRef} style={{ background: T.bg, minHeight: '100vh', color: T.text1, transition: 'background 0.3s, color 0.3s' }}>
+    <div style={{ background: 'var(--bg)', minHeight: '100vh', color: 'var(--text1)' }}>
       <Navbar />
 
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '36px 24px 100px' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      <main style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 20px 80px' }}>
 
-          {/* ── PAGE HEADER ──────────────────────────────────────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-              <div style={{ flex: 1, minWidth: 240 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: T.brandLight, background: T.brandBg, border: `1px solid ${T.brandBdr}`, borderRadius: 20, padding: '4px 12px' }}>
-                    Analysis Complete
-                  </span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: overallColor, background: overallScore >= 70 ? T.successBg : overallScore >= 45 ? T.warningBg : T.dangerBg, border: `1px solid ${overallScore >= 70 ? T.successBdr : overallScore >= 45 ? T.warningBdr : T.dangerBdr}`, borderRadius: 20, padding: '4px 12px' }}>
-                    <Award size={10} /> Grade {grade.letter} — {grade.label}
-                  </span>
-                </div>
-                <h1 style={{ fontSize: 30, fontWeight: 800, color: T.text1, margin: 0, lineHeight: 1.2, letterSpacing: '-0.02em' }}>
-                  {startupDetails.startupName || 'Venture Proposal'}
-                </h1>
-                <p style={{ fontSize: 14, color: T.text2, marginTop: 8, lineHeight: 1.7, maxWidth: 560, margin: '8px 0 0' }}>
-                  Evaluated across 9 critical dimensions using 5 specialized AI agents.
-                </p>
+        {/* ── HERO HEADER ── */}
+        <div className="animate-fade-up" style={{ marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
+            <div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10, flexWrap: 'wrap' }}>
+                <span className="badge badge-brand"><Sparkles size={10} /> Analysis Complete</span>
+                <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: grade.color, background: grade.bg, border: `1px solid ${grade.border}`, borderRadius: 99, padding: '3px 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Award size={10} /> Grade {grade.letter} · {grade.label}
+                </span>
               </div>
-
-              {/* Action buttons */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
-                <button onClick={() => setIsLight(v => !v)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, color: T.text2, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: T.shadow, transition: 'all 0.2s', lineHeight: 1 }}>
-                  {isLight ? <Moon size={13} /> : <Sun size={13} />}
-                  {isLight ? 'Dark Mode' : 'Light Mode'}
-                </button>
-                <button onClick={handleReanalyze} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, color: T.text2, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: T.shadow, transition: 'all 0.2s', lineHeight: 1 }}>
-                  <RefreshCw size={13} /> Reanalyze
-                </button>
-                <button onClick={handleExport} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, color: T.text2, fontSize: 12, fontWeight: 600, cursor: 'pointer', boxShadow: T.shadow, transition: 'all 0.2s', lineHeight: 1 }}>
-                  <Download size={13} /> Export PDF
-                </button>
-                <button onClick={handleSave} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 20px', borderRadius: 8, border: 'none', background: T.brand, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: T.shadowBrand, transition: 'all 0.2s', lineHeight: 1 }}>
-                  <Save size={13} /> Save & Finish
-                </button>
+              <h1 style={{ fontSize: 28, fontWeight: 900, color: 'var(--text1)', margin: 0, letterSpacing: '-0.03em', marginBottom: 4 }}>
+                {startupDetails.startupName || 'Venture Proposal'}
+              </h1>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {[[Globe, startupDetails.startupDomain], [DollarSign, startupDetails.revenueModel], [Clock, startupDetails.mvpTimeline]].filter(([,v]) => v).map(([Icon, val], i) => (
+                  <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--text2)', padding: '4px 10px', borderRadius: 99, background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                    <Icon size={11} style={{ color: 'var(--brand-light)' }} /> {val}
+                  </span>
+                ))}
               </div>
             </div>
 
-            {/* Quick info pills */}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {[
-                { label: 'Domain',   val: startupDetails.startupDomain,   icon: Globe },
-                { label: 'Revenue',  val: startupDetails.revenueModel,    icon: DollarSign },
-                { label: 'Funding',  val: startupDetails.availableFunding, icon: BarChart2 },
-                { label: 'Timeline', val: startupDetails.mvpTimeline,     icon: Clock },
-              ].map(({ label, val, icon: Ic }) => !val ? null : (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface, boxShadow: T.shadow }}>
-                  <Ic size={12} style={{ color: T.brandLight }} />
-                  <span style={{ fontSize: 10, fontWeight: 700, color: T.text3, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{label}</span>
-                  <span style={{ fontSize: 12, fontWeight: 700, color: T.text1 }}>{val}</span>
-                </div>
-              ))}
+            {/* Action buttons */}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexShrink: 0 }}>
+              <button onClick={() => navigate('/analysis/loader')} className="btn btn-outline btn-sm">
+                <RefreshCw size={12} /> Re-run
+              </button>
+              <button onClick={handleExport} className="btn btn-outline btn-sm">
+                <Download size={12} /> Export
+              </button>
+              <button onClick={handleSave} className="btn btn-primary btn-sm">
+                <Save size={12} /> Save & Finish
+              </button>
             </div>
           </div>
 
-          {/* ── OVERALL SCORE HERO ───────────────────────────────────────── */}
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 18, padding: '32px 36px', boxShadow: T.shadowMd, display: 'flex', alignItems: 'center', gap: 36, flexWrap: 'wrap' }}>
-            <div style={{ flexShrink: 0 }}>
-              <ScoreArc score={overallScore} size={148} strokeWidth={11} color={overallColor} trackColor={T.track} />
-            </div>
+          {/* Score + Grade hero card */}
+          <div className="gradient-border" style={{ padding: 24, display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap', background: 'var(--surface)' }}>
+            <AnimatedScore score={overall} size={120} stroke={10} />
+
             <div style={{ flex: 1, minWidth: 220 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 56, fontWeight: 900, color: overallColor, lineHeight: 1, letterSpacing: '-0.03em' }}>{grade.letter}</span>
-                <div>
-                  <p style={{ fontSize: 20, fontWeight: 800, color: T.text1, margin: 0, letterSpacing: '-0.01em' }}>{grade.label} Viability</p>
-                  <p style={{ fontSize: 12, color: T.text2, margin: '3px 0 0' }}>Composite score across all analysis dimensions</p>
-                </div>
-              </div>
-              <p style={{ fontSize: 14, color: T.text2, lineHeight: 1.75, margin: 0, maxWidth: 500 }}>
-                {ap.feasibility?.summary || ap.market_opportunity?.summary ||
-                  `${grade.desc} Your startup "${startupDetails.startupName || 'venture'}" scored ${overallScore}/100 across market, competition, innovation, risk, and feasibility dimensions.`}
+              <div style={{ fontSize: 32, fontWeight: 900, color: grade.color, lineHeight: 1, marginBottom: 6, fontFamily: 'var(--font-heading)' }}>{grade.label} Viability</div>
+              <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, margin: '0 0 14px' }}>
+                {fe.summary || mo.summary || `Your startup scored ${overall}/100 across market, competition, innovation, risk, and feasibility dimensions.`}
               </p>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0, minWidth: 160 }}>
-              {[
-                { label: 'Metrics Analyzed', val: '9',   color: T.brandLight },
-                { label: 'AI Agents',         val: '5',  color: T.purple     },
-                { label: 'Dimensions',        val: '50+',color: T.success    },
-              ].map(({ label, val, color }) => (
-                <div key={label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, padding: '10px 14px', borderRadius: 10, background: T.surface2, border: `1px solid ${T.border}` }}>
-                  <span style={{ fontSize: 11, color: T.text2, fontWeight: 500 }}>{label}</span>
-                  <span style={{ fontSize: 18, fontWeight: 900, color }}>{val}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* ── KEY INSIGHTS SUMMARY ─────────────────────────────────────── */}
-          {keyInsights.length > 0 && (
-            <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 14, padding: '22px 24px', boxShadow: T.shadow }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                <Sparkles size={14} style={{ color: T.brandLight }} />
-                <h2 style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: T.brandLight, margin: 0 }}>Key Insights</h2>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {keyInsights.map(({ icon: Icon, color, text }, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 16px', borderRadius: 10, background: T.surface2, border: `1px solid ${T.border}` }}>
-                    <div style={{ width: 28, height: 28, borderRadius: 7, background: color + '18', border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-                      <Icon size={13} style={{ color }} />
-                    </div>
-                    <p style={{ fontSize: 13, color: T.text2, lineHeight: 1.65, margin: 0 }}>{text}</p>
+              <div style={{ display: 'flex', gap: 16 }}>
+                {[
+                  { label: 'AI Agents',   val: '5',   color: 'var(--brand-light)' },
+                  { label: 'Dimensions',  val: '9',   color: 'var(--cyan)'        },
+                  { label: 'Data Points', val: '250+',color: 'var(--green)'       },
+                ].map(({ label, val, color }) => (
+                  <div key={label}>
+                    <div style={{ fontSize: 20, fontWeight: 900, color, fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{val}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>{label}</div>
                   </div>
                 ))}
               </div>
             </div>
-          )}
 
-          {/* ── SCORE METRIC GRID ────────────────────────────────────────── */}
-          <section>
-            <SectionHeader
-              label="Score Overview"
-              sub="Detailed breakdown across 9 key performance indicators, each scored independently by AI agents."
-            />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px,1fr))', gap: 12 }}>
-              {metricMeta.map((m) => {
-                const Icon = m.icon;
-                const sd = getScore(m.id);
-                const sColor = scoreColor(sd.score);
-                const badge  = verdictMeta(sd.status);
+            {/* Score bars for all 9 metrics */}
+            <div style={{ width: 240, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {metricRows.slice(0, 5).map(({ id, label }) => {
+                const s = analysisScores[id]?.score || 0;
+                return <ScoreBar key={id} score={s} label={label} />;
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── TAB NAV ── */}
+        <div style={{ display: 'flex', gap: 2, marginBottom: 24, background: 'var(--surface)', padding: 4, borderRadius: 12, overflowX: 'auto', border: '1px solid var(--border)' }}>
+          {TABS.map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setActiveTab(id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '7px 14px', borderRadius: 8, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
+                background: activeTab === id ? 'var(--brand)' : 'transparent',
+                color: activeTab === id ? '#fff' : 'var(--text2)',
+              }}
+              onMouseEnter={e => { if (activeTab !== id) e.currentTarget.style.color = 'var(--text1)'; }}
+              onMouseLeave={e => { if (activeTab !== id) e.currentTarget.style.color = 'var(--text2)'; }}>
+              <Icon size={12} /> {label}
+            </button>
+          ))}
+        </div>
+
+        {/* ══════════════════════════════════════════════════════
+            TAB: OVERVIEW
+        ══════════════════════════════════════════════════════ */}
+        {activeTab === 'overview' && (
+          <div className="animate-fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+            {/* 9-Metric grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+              {metricRows.map(({ id, label, icon: Icon }) => {
+                const sd = analysisScores[id] || { score: 0, status: 'N/A', details: '' };
+                const color = sc(sd.score);
+                const badge = vm(sd.status);
                 return (
-                  <div key={m.id} className="agent-card" style={{ padding: '18px 20px', display: 'flex', gap: 14, alignItems: 'flex-start' }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.boxShadow = 'var(--shadow-md)'; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)';  e.currentTarget.style.boxShadow = 'none'; }}>
-                    <ScoreArc score={sd.score} size={64} strokeWidth={5} color={sColor} trackColor={T.track} />
+                  <div key={id} className="glass-card" style={{ padding: '16px 18px', display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 12, background: color + '15', border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Icon size={18} style={{ color }} />
+                    </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                        <Icon size={12} style={{ color: T.brandLight, flexShrink: 0 }} />
-                        <span style={{ fontSize: 12, fontWeight: 700, color: T.text1, lineHeight: 1.3 }}>{m.label}</span>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text1)', marginBottom: 4 }}>{label}</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                        <span style={{ fontSize: 22, fontWeight: 900, color, fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{sd.score}</span>
+                        <span className={badge.cls} style={{ fontSize: 9 }}>{sd.status}</span>
                       </div>
-                      <span style={{ fontSize: 9.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: badge.color, background: badge.bg, border: `1px solid ${badge.border}`, borderRadius: 20, padding: '2px 8px', display: 'inline-block', marginBottom: 6 }}>
-                        {sd.status}
-                      </span>
-                      <p style={{ fontSize: 11.5, color: T.text2, lineHeight: 1.55, margin: 0 }}>
-                        {sd.details || m.desc}
-                      </p>
+                      {sd.details && <div style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{sd.details}</div>}
                     </div>
                   </div>
                 );
               })}
             </div>
-          </section>
 
-          {/* ── DEEP AGENT ANALYSIS ──────────────────────────────────────── */}
-          {agents.some(a => a.data) && (
-            <section>
-              <SectionHeader
-                label="AI Deep Analysis"
-                sub="Expanded insights from each specialized AI agent — strengths, weaknesses, risks, and strategic recommendations."
-              />
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {agents.map(({ key, label, icon: Icon, data, color, bgColor, bdrColor }) => {
-                  if (!data) return null;
-                  const isOpen     = expandedAgent === key;
-                  const agentBadge = verdictMeta(data.verdict);
-                  const agentScore = Math.round(data.score || 0);
-                  const agentColor = scoreColor(agentScore);
-
-                  return (
-                    <div key={key} className={`agent-card${isOpen ? ' open' : ''}`}
-                      style={{ borderColor: isOpen ? color + '40' : 'var(--border)', boxShadow: isOpen ? T.shadowMd : 'none', transition: 'all 0.25s ease' }}>
-
-                      {/* Accordion header */}
-                      <button
-                        onClick={() => setExpandedAgent(isOpen ? null : key)}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', background: 'transparent', border: 'none', cursor: 'pointer', gap: 16, textAlign: 'left' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                          <div style={{ width: 42, height: 42, borderRadius: 11, background: bgColor, border: `1px solid ${bdrColor}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <Icon size={18} style={{ color }} />
-                          </div>
-                          <div>
-                            <p style={{ fontSize: 14, fontWeight: 700, color: T.text1, margin: 0, letterSpacing: '-0.01em' }}>{label}</p>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: agentBadge.color, background: agentBadge.bg, border: `1px solid ${agentBadge.border}`, borderRadius: 20, padding: '2px 8px' }}>
-                                {data.verdict || 'N/A'}
-                              </span>
-                              <span style={{ fontSize: 11, color: T.text3 }}>
-                                Score: <strong style={{ color: agentColor, fontWeight: 800 }}>{agentScore} / 100</strong>
-                              </span>
-                            </div>
+            {/* Agent accordion */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <h3 style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text3)', margin: '8px 0 4px' }}>Deep AI Analysis</h3>
+              {agents.map(({ key, label, icon: Icon, data, color }) => {
+                if (!data?.summary && !data?.verdict) return null;
+                const isOpen  = expandedAgent === key;
+                const agentBadge = vm(data.verdict || '');
+                const agentScore = Math.round(data.score || 0);
+                return (
+                  <div key={key} className={`agent-card${isOpen ? ' open' : ''}`} style={{ borderColor: isOpen ? color + '40' : 'var(--border)', transition: 'all 0.2s' }}>
+                    <button onClick={() => setExpandedAgent(isOpen ? null : key)}
+                      style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', background: 'transparent', border: 'none', cursor: 'pointer', gap: 14, textAlign: 'left' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 38, height: 38, borderRadius: 10, background: color + '18', border: `1px solid ${color}30`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <Icon size={16} style={{ color }} />
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text1)', marginBottom: 3 }}>{label} Analysis</div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <span className={agentBadge.cls} style={{ fontSize: 9 }}>{data.verdict || 'N/A'}</span>
+                            <span style={{ fontSize: 10, color: 'var(--text3)' }}>Score: <strong style={{ color: sc(agentScore) }}>{agentScore}/100</strong></span>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-                          <ScoreArc score={agentScore} size={40} strokeWidth={4} color={agentColor} trackColor={T.track} />
-                          {isOpen
-                            ? <ChevronUp   size={16} style={{ color: T.text3 }} />
-                            : <ChevronDown size={16} style={{ color: T.text3 }} />
-                          }
-                        </div>
-                      </button>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+                        <span style={{ fontSize: 18, fontWeight: 900, color: sc(agentScore), fontFamily: 'var(--font-mono)' }}>{agentScore}</span>
+                        {isOpen ? <ChevronUp size={15} style={{ color: 'var(--text3)' }} /> : <ChevronDown size={15} style={{ color: 'var(--text3)' }} />}
+                      </div>
+                    </button>
 
-                      {/* Accordion body — smooth height via max-height transition */}
-                      <div style={{
-                        maxHeight: isOpen ? '2000px' : '0px',
-                        overflow: 'hidden',
-                        transition: 'max-height 0.4s cubic-bezier(0.4,0,0.2,1)',
-                      }}>
-                        <div style={{ borderTop: `1px solid ${T.border}`, padding: '28px 24px', display: 'flex', flexDirection: 'column', gap: 24 }}>
-
-                          {/* Summary */}
-                          {data.summary && (
-                            <div style={{ padding: '18px 22px', background: T.surface2, borderRadius: 12, borderLeft: `3px solid ${color}` }}>
-                              <p style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color, margin: '0 0 10px' }}>Summary</p>
-                              <p style={{ fontSize: 13.5, color: T.text1, lineHeight: 1.8, margin: 0, fontWeight: 500 }}>{data.summary}</p>
+                    <div style={{ maxHeight: isOpen ? '2000px' : 0, overflow: 'hidden', transition: 'max-height 0.4s cubic-bezier(0.4,0,0.2,1)' }}>
+                      <div style={{ borderTop: '1px solid var(--border)', padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+                        {data.summary && (
+                          <div style={{ padding: '14px 18px', background: 'var(--surface2)', borderRadius: 10, borderLeft: `3px solid ${color}` }}>
+                            <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color, marginBottom: 8 }}>Summary</div>
+                            <p style={{ fontSize: 13, color: 'var(--text1)', lineHeight: 1.75, margin: 0, fontWeight: 500 }}>{data.summary}</p>
+                          </div>
+                        )}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 16 }}>
+                          {[
+                            { title: 'Strengths',          items: data.strengths,           color: 'var(--green)'       },
+                            { title: 'Weaknesses',         items: data.weaknesses,          color: 'var(--red)'         },
+                            { title: 'Recommendations',    items: data.recommendations,     color: 'var(--brand-light)' },
+                            { title: 'Key Competitors',    items: data.key_competitors,     color: 'var(--amber)'       },
+                            { title: 'Competitive Gaps',   items: data.competitive_gaps,    color: 'var(--cyan)'        },
+                            { title: 'Demand Signals',     items: data.demand_signals,      color: 'var(--green)'       },
+                            { title: 'Risk Factors',       items: data.risks,               color: 'var(--red)'         },
+                            { title: 'Innovation Factors', items: data.innovation_factors,  color: 'var(--cyan)'        },
+                          ].filter(s => s.items?.length).map(({ title, items, color: c }) => (
+                            <div key={title} style={{ padding: '14px 16px', background: 'var(--surface2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+                              <div style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: c, marginBottom: 10 }}>✦ {title}</div>
+                              <BulletList items={items} color={c} />
                             </div>
-                          )}
-
-                          {/* Two-column list grid */}
-                          {(() => {
-                            const sections = [
-                              { title: 'Strengths',         items: data.strengths,           color: T.success    },
-                              { title: 'Weaknesses',        items: data.weaknesses,          color: T.danger     },
-                              { title: 'Recommendations',   items: data.recommendations,     color: T.brandLight },
-                              { title: 'Key Competitors',   items: data.key_competitors,     color: T.warning    },
-                              { title: 'Competitive Gaps',  items: data.competitive_gaps,    color: T.purple     },
-                              { title: 'Demand Signals',    items: data.demand_signals,      color: T.success    },
-                              { title: 'Key Risks',         items: data.risks,               color: T.warning    },
-                              { title: 'Innovation Factors',items: data.innovation_factors,  color: T.purple     },
-                            ].filter(s => s.items?.length);
-
-                            if (!sections.length) return null;
-                            return (
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 20 }}>
-                                {sections.map(({ title, items, color: c }) => (
-                                  <div key={title} style={{ padding: '16px 18px', background: T.surface2, borderRadius: 12, border: `1px solid ${T.border}` }}>
-                                    <p style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.09em', color: c, margin: '0 0 10px' }}>✦ {title}</p>
-                                    {renderBullets(items, c)}
-                                  </div>
-                                ))}
-                              </div>
-                            );
-                          })()}
-
-                          {/* Insight pill cards */}
-                          {(() => {
-                            const insights = [
-                              data.tam_signal            && { title: 'TAM Signal',     value: data.tam_signal,                color: T.brandLight, bg: T.brandBg,   bdr: T.brandBdr   },
-                              data.timing_assessment     && { title: 'Market Timing',  value: data.timing_assessment,         color: T.brandLight, bg: T.brandBg,   bdr: T.brandBdr   },
-                              data.usp_statement         && { title: 'USP Statement',  value: data.usp_statement,             color: T.purple,     bg: T.purpleBg,  bdr: T.purpleBdr  },
-                              data.defensibility         && { title: 'Defensibility',  value: data.defensibility,             color: T.success,    bg: T.successBg, bdr: T.successBdr },
-                              data.differentiation_strength && { title: 'Differentiation', value: data.differentiation_strength, color: T.warning, bg: T.warningBg, bdr: T.warningBdr },
-                              data.overall_risk_level    && { title: 'Overall Risk',   value: data.overall_risk_level,        color: T.danger,     bg: T.dangerBg,  bdr: T.dangerBdr  },
-                            ].filter(Boolean);
-
-                            if (!insights.length) return null;
-                            return (
-                              <div>
-                                <p style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: T.text3, marginBottom: 12 }}>Key Insights</p>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(190px,1fr))', gap: 10 }}>
-                                  {insights.map(({ title, value, color: c, bg, bdr }) => (
-                                    <InsightCard key={title} title={title} value={value} color={c} bg={bg} bdr={bdr} />
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })()}
+                          ))}
+                        </div>
+                        {/* Insight pills */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                          {[
+                            data.tam_signal         && { label: 'TAM',           val: data.tam_signal,            color: 'var(--brand-light)', bg: 'var(--brand-bg)', border: 'var(--brand-border)' },
+                            data.timing_assessment  && { label: 'Timing',        val: data.timing_assessment,     color: 'var(--cyan)',        bg: 'var(--cyan-bg)',  border: 'var(--cyan-border)'  },
+                            data.usp_statement      && { label: 'USP',           val: data.usp_statement,         color: 'var(--brand-light)', bg: 'var(--brand-bg)', border: 'var(--brand-border)' },
+                            data.defensibility      && { label: 'Defensibility', val: data.defensibility,         color: 'var(--green)',       bg: 'var(--green-bg)', border: 'var(--green-border)' },
+                            data.overall_risk_level && { label: 'Risk Level',    val: data.overall_risk_level,    color: 'var(--red)',         bg: 'var(--red-bg)',   border: 'var(--red-border)'   },
+                            data.differentiation_strength && { label: 'Differentiation', val: data.differentiation_strength, color: 'var(--amber)', bg: 'var(--amber-bg)', border: 'var(--amber-border)' },
+                          ].filter(Boolean).map(({ label, val, color: c, bg, border }) => (
+                            <div key={label} style={{ padding: '10px 14px', background: bg, border: `1px solid ${border}`, borderRadius: 10, maxWidth: 280 }}>
+                              <div style={{ fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: c, marginBottom: 4 }}>{label}</div>
+                              <div style={{ fontSize: 12, color: 'var(--text1)', lineHeight: 1.5 }}>{val}</div>
+                            </div>
+                          ))}
                         </div>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            </section>
-          )}
-
-          {/* ── CTA FOOTER CARD ──────────────────────────────────────────── */}
-          <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: '24px 28px', boxShadow: T.shadow, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-            <div>
-              <p style={{ fontSize: 15, fontWeight: 700, color: T.text1, margin: '0 0 4px', letterSpacing: '-0.01em' }}>Ready to build your execution roadmap?</p>
-              <p style={{ fontSize: 12.5, color: T.text2, margin: 0, lineHeight: 1.6 }}>
-                Save this analysis and generate an AI-powered roadmap — assign tasks to your team by role and skill.
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: 10, flexShrink: 0 }}>
-              <button onClick={() => navigate('/dashboard')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 18px', borderRadius: 8, border: `1px solid ${T.border}`, background: T.surface2, color: T.text2, fontSize: 12, fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', lineHeight: 1 }}>
-                <LayoutDashboard size={13} /> Dashboard
-              </button>
-              <button onClick={handleSave} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '10px 22px', borderRadius: 8, border: 'none', background: T.brand, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', boxShadow: T.shadowBrand, transition: 'all 0.2s', lineHeight: 1 }}>
-                <Rocket size={13} /> Save & Build Roadmap
-              </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
+        )}
 
+        {/* ══════════════════════════════════════════════════════
+            TAB: MARKET
+        ══════════════════════════════════════════════════════ */}
+        {activeTab === 'market' && (
+          <div className="animate-fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+
+              {/* Market Score */}
+              <div className="glass-card" style={{ padding: 22 }}>
+                <SectionHead icon={TrendingUp} label="Market Opportunity" color="var(--green)" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+                  <div style={{ fontSize: 48, fontWeight: 900, color: sc(mo.score || 0), fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{Math.round(mo.score || 0)}</div>
+                  <div>
+                    <span className={vm(mo.verdict || '').cls}>{mo.verdict || 'N/A'}</span>
+                    <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 4 }}>out of 100</div>
+                  </div>
+                </div>
+                {mo.summary && <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, margin: 0 }}>{mo.summary}</p>}
+              </div>
+
+              {/* TAM */}
+              {mo.tam_signal && (
+                <div className="glass-card" style={{ padding: 22, borderColor: 'var(--green-border)', background: 'var(--green-bg)' }}>
+                  <SectionHead icon={Globe} label="TAM Signal" color="var(--green)" />
+                  <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text1)', lineHeight: 1.6, margin: 0 }}>{mo.tam_signal}</p>
+                </div>
+              )}
+
+              {/* Market timing */}
+              {mo.timing_assessment && (
+                <div className="glass-card" style={{ padding: 22 }}>
+                  <SectionHead icon={Clock} label="Market Timing" color="var(--cyan)" />
+                  <p style={{ fontSize: 13, color: 'var(--text1)', lineHeight: 1.7, margin: 0 }}>{mo.timing_assessment}</p>
+                </div>
+              )}
+
+              {/* Demand signals */}
+              {mo.demand_signals?.length > 0 && (
+                <div className="glass-card" style={{ padding: 22 }}>
+                  <SectionHead icon={Activity} label="Demand Signals" color="var(--green)" count={mo.demand_signals.length} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {mo.demand_signals.map((s, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 10px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                        <CheckCircle2 size={13} style={{ color: 'var(--green)', flexShrink: 0, marginTop: 1 }} />
+                        <span style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>{s}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Recommendations */}
+              {mo.recommendations?.length > 0 && (
+                <div className="glass-card" style={{ padding: 22 }}>
+                  <SectionHead icon={Lightbulb} label="Market Recommendations" color="var(--brand-light)" />
+                  <BulletList items={mo.recommendations} color="var(--brand-light)" />
+                </div>
+              )}
+
+              {/* Query phase stats */}
+              {qp.total_agents && (
+                <div className="glass-card" style={{ padding: 22 }}>
+                  <SectionHead icon={Database} label="Data Collection Stats" color="var(--cyan)" />
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    {[
+                      { label: 'Agents Run',       val: qp.total_agents,       color: 'var(--brand-light)' },
+                      { label: 'Successful',        val: qp.successful_agents,  color: 'var(--green)'       },
+                      { label: 'Docs Indexed',      val: qp.total_docs_indexed, color: 'var(--cyan)'        },
+                      { label: 'Failed',            val: qp.failed_agents || 0, color: qp.failed_agents > 0 ? 'var(--red)' : 'var(--text3)' },
+                    ].map(({ label, val, color: c }) => (
+                      <div key={label} style={{ padding: '10px 12px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                        <div style={{ fontSize: 20, fontWeight: 900, color: c, fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{val}</div>
+                        <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3 }}>{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════
+            TAB: COMPETITION
+        ══════════════════════════════════════════════════════ */}
+        {activeTab === 'competition' && (
+          <div className="animate-fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+
+              {/* Competition score */}
+              <div className="glass-card" style={{ padding: 22 }}>
+                <SectionHead icon={Swords} label="Competition Analysis" color="var(--amber)" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
+                  <div style={{ fontSize: 48, fontWeight: 900, color: sc(co.score || 0), fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{Math.round(co.score || 0)}</div>
+                  <span className={vm(co.verdict || '').cls}>{co.verdict || 'N/A'}</span>
+                </div>
+                {co.summary && <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, margin: 0 }}>{co.summary}</p>}
+              </div>
+
+              {/* Key competitors */}
+              {co.key_competitors?.length > 0 && (
+                <div className="glass-card" style={{ padding: 22 }}>
+                  <SectionHead icon={Users} label="Key Competitors" color="var(--amber)" count={co.key_competitors.length} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {co.key_competitors.map((c_, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                        <div style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--amber-bg)', border: '1px solid var(--amber-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: 'var(--amber)', flexShrink: 0 }}>
+                          {i + 1}
+                        </div>
+                        <span style={{ fontSize: 13, color: 'var(--text1)', fontWeight: 500 }}>{c_}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Competitive gaps */}
+              {co.competitive_gaps?.length > 0 && (
+                <div className="glass-card" style={{ padding: 22 }}>
+                  <SectionHead icon={Target} label="Competitive Gaps to Exploit" color="var(--green)" count={co.competitive_gaps.length} />
+                  <BulletList items={co.competitive_gaps} color="var(--green)" />
+                </div>
+              )}
+
+              {/* Differentiation */}
+              {(co.differentiation_strength || co.differentiation_vs_competitors?.length > 0) && (
+                <div className="glass-card" style={{ padding: 22, borderColor: 'var(--brand-border)', background: 'var(--brand-bg)' }}>
+                  <SectionHead icon={Star} label="Differentiation" color="var(--brand-light)" />
+                  {co.differentiation_strength && (
+                    <p style={{ fontSize: 13, color: 'var(--text1)', lineHeight: 1.7, margin: '0 0 12px' }}>{co.differentiation_strength}</p>
+                  )}
+                  {co.differentiation_vs_competitors?.length > 0 && (
+                    <TagChips items={co.differentiation_vs_competitors} color="var(--brand-light)" bg="var(--brand-bg)" border="var(--brand-border)" />
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════
+            TAB: RISKS
+        ══════════════════════════════════════════════════════ */}
+        {activeTab === 'risks' && (
+          <div className="animate-fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+
+              {/* Risk score */}
+              <div className="glass-card" style={{ padding: 22, borderColor: ri.overall_risk_level?.toLowerCase().includes('high') ? 'var(--red-border)' : 'var(--border)' }}>
+                <SectionHead icon={ShieldAlert} label="Risk Assessment" color="var(--red)" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
+                  <div style={{ fontSize: 48, fontWeight: 900, color: sc(ri.score || 0), fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{Math.round(ri.score || 0)}</div>
+                  <div>
+                    <span className={vm(ri.verdict || '').cls}>{ri.verdict || 'N/A'}</span>
+                    {ri.overall_risk_level && <div style={{ fontSize: 11, color: 'var(--text2)', marginTop: 4 }}>Level: <strong style={{ color: 'var(--red)' }}>{ri.overall_risk_level}</strong></div>}
+                  </div>
+                </div>
+                {ri.summary && <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, margin: 0 }}>{ri.summary}</p>}
+              </div>
+
+              {/* Risk factors */}
+              {ri.risks?.length > 0 && (
+                <div className="glass-card" style={{ padding: 22 }}>
+                  <SectionHead icon={AlertCircle} label="Risk Factors" color="var(--red)" count={ri.risks.length} />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {ri.risks.map((r_, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '8px 12px', background: 'var(--red-bg)', borderRadius: 8, border: '1px solid var(--red-border)' }}>
+                        <XCircle size={13} style={{ color: 'var(--red)', flexShrink: 0, marginTop: 1 }} />
+                        <span style={{ fontSize: 12, color: 'var(--text1)', lineHeight: 1.5 }}>{r_}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Mitigation recommendations */}
+              {ri.recommendations?.length > 0 && (
+                <div className="glass-card" style={{ padding: 22 }}>
+                  <SectionHead icon={Shield} label="Risk Mitigation" color="var(--green)" />
+                  <BulletList items={ri.recommendations} color="var(--green)" />
+                </div>
+              )}
+
+              {/* Feasibility */}
+              <div className="glass-card" style={{ padding: 22 }}>
+                <SectionHead icon={Gauge} label="Feasibility Check" color="var(--brand-light)" />
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {[
+                    { label: 'Strengths',    items: fe.strengths,       color: 'var(--green)' },
+                    { label: 'Weaknesses',   items: fe.weaknesses,      color: 'var(--red)'   },
+                  ].filter(s => s.items?.length).map(({ label, items, color: c }) => (
+                    <div key={label}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: c, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>{label}</div>
+                      <BulletList items={items} color={c} max={3} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════
+            TAB: INTELLIGENCE (USP + Innovation)
+        ══════════════════════════════════════════════════════ */}
+        {activeTab === 'intelligence' && (
+          <div className="animate-fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
+
+              {/* Innovation score */}
+              <div className="glass-card" style={{ padding: 22 }}>
+                <SectionHead icon={Zap} label="Innovation Score" color="var(--cyan)" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 12 }}>
+                  <div style={{ fontSize: 48, fontWeight: 900, color: sc(inn.score || 0), fontFamily: 'var(--font-mono)', lineHeight: 1 }}>{Math.round(inn.score || 0)}</div>
+                  <span className={vm(inn.verdict || '').cls}>{inn.verdict || 'N/A'}</span>
+                </div>
+                {inn.summary && <p style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.7, margin: 0 }}>{inn.summary}</p>}
+              </div>
+
+              {/* USP */}
+              {inn.usp_statement && (
+                <div className="glass-card" style={{ padding: 22, borderColor: 'var(--cyan-border)', background: 'var(--cyan-bg)' }}>
+                  <SectionHead icon={Lightbulb} label="Unique Selling Proposition" color="var(--cyan)" />
+                  <p style={{ fontSize: 15, fontWeight: 700, color: 'var(--text1)', lineHeight: 1.6, margin: 0, fontStyle: 'italic' }}>"{inn.usp_statement}"</p>
+                </div>
+              )}
+
+              {/* Defensibility */}
+              {inn.defensibility && (
+                <div className="glass-card" style={{ padding: 22 }}>
+                  <SectionHead icon={Shield} label="Defensibility" color="var(--green)" />
+                  <p style={{ fontSize: 13, color: 'var(--text1)', lineHeight: 1.7, margin: 0 }}>{inn.defensibility}</p>
+                </div>
+              )}
+
+              {/* Innovation factors */}
+              {inn.innovation_factors?.length > 0 && (
+                <div className="glass-card" style={{ padding: 22 }}>
+                  <SectionHead icon={Sparkles} label="Innovation Factors" color="var(--cyan)" count={inn.innovation_factors.length} />
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {inn.innovation_factors.map((f, i) => (
+                      <span key={i} style={{ fontSize: 11, padding: '5px 12px', borderRadius: 99, background: 'var(--cyan-bg)', border: '1px solid var(--cyan-border)', color: 'var(--cyan)', fontWeight: 600 }}>
+                        ⚡ {f}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════════
+            TAB: PITCH
+        ══════════════════════════════════════════════════════ */}
+        {activeTab === 'pitch' && (
+          <div className="animate-fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {pp.pitch_text ? (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 280px', gap: 16, alignItems: 'start' }}>
+
+                {/* Pitch text */}
+                <div className="glass-card" style={{ padding: 28 }}>
+                  <SectionHead icon={BookOpen} label="AI-Generated Pitch" color="var(--brand-light)" />
+                  <div style={{ fontSize: 14, color: 'var(--text1)', lineHeight: 1.85, whiteSpace: 'pre-wrap', fontWeight: 400 }}>
+                    {pp.pitch_text}
+                  </div>
+                </div>
+
+                {/* Pitch stats */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {[
+                    { label: 'Pitch Length',    val: `${pp.pitch_length || 0} chars`,    color: 'var(--brand-light)' },
+                    { label: 'Docs Indexed',    val: pp.indexed_chunks || 0,              color: 'var(--cyan)'        },
+                    { label: 'Startup',         val: pp.startup_name || startupDetails.startupName, color: 'var(--text1)' },
+                  ].map(({ label, val, color: c }) => (
+                    <div key={label} className="glass-card" style={{ padding: '14px 16px' }}>
+                      <div style={{ fontSize: 10, color: 'var(--text3)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>{label}</div>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: c, fontFamily: 'var(--font-mono)' }}>{val}</div>
+                    </div>
+                  ))}
+                  <button onClick={() => { navigator.clipboard?.writeText(pp.pitch_text); showToast('Pitch copied!', 'success'); }}
+                    className="btn btn-outline" style={{ justifyContent: 'center' }}>
+                    <FileText size={13} /> Copy Pitch
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="glass-card" style={{ padding: 48, textAlign: 'center' }}>
+                <BookOpen size={32} style={{ color: 'var(--text3)', margin: '0 auto 12px' }} />
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text2)' }}>No pitch data available</div>
+                <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 4 }}>Run a new validation to generate your AI pitch</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── CTA Footer ── */}
+        <div className="gradient-border animate-fade-up delay-300" style={{ padding: '22px 26px', marginTop: 32, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text1)', marginBottom: 3 }}>Ready to build your execution roadmap?</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6 }}>Save this analysis and generate an AI-powered task roadmap for your team.</div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={() => navigate('/dashboard')} className="btn btn-outline btn-sm">
+              <LayoutDashboard size={12} /> Dashboard
+            </button>
+            <button onClick={handleSave} className="btn btn-primary">
+              <Rocket size={13} /> Save & Build Roadmap
+            </button>
+          </div>
         </div>
-      </main>
 
-      <footer style={{ borderTop: `1px solid ${T.border}`, padding: '24px', textAlign: 'center', fontSize: 12, color: T.text3, background: T.surface }}>
-        <span>© {new Date().getFullYear()} StartupXpert &nbsp;·&nbsp; AI Feasibility Engine &nbsp;·&nbsp; </span>
-        <span style={{ color: T.brandLight, fontWeight: 600 }}>Powered by AI</span>
-      </footer>
+      </main>
     </div>
   );
 };
