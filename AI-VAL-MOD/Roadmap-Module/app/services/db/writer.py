@@ -64,9 +64,11 @@ def write_branch(profiler_id: str, session_id: str, branch: str, status: str, su
     return row["id"] if row else None
 
 
-def write_tasks(branch_id: str, tasks: List[Dict]) -> None:
+def write_tasks(branch_id: str, tasks: List[Dict]) -> List[Dict]:
+    """Insert tasks and return list of {task_id, db_id} mappings."""
+    results = []
     for task in tasks:
-        _insert("roadmap_tasks", {
+        row = _insert("roadmap_tasks", {
             "branch_id":       branch_id,
             "task_id":         task["task_id"],
             "title":           task.get("title"),
@@ -78,11 +80,16 @@ def write_tasks(branch_id: str, tasks: List[Dict]) -> None:
             "estimated_hours": task.get("estimated_hours"),
             "complexity":      task.get("complexity"),
             "cost_impact":     task.get("cost_impact"),
-            "dep_status":     task.get("status", "Ready"),
+            "dep_status":      task.get("status", "Ready"),
             "blocked_by":      task.get("blocked_by", []),
             "unblocks":        task.get("unblocks", []),
         })
+        results.append({
+            "task_id": task["task_id"],
+            "db_id":   row["id"] if row else None,
+        })
     logger.info("[DBWriter:roadmap_tasks] wrote %d tasks for branch_id=%s", len(tasks), branch_id)
+    return results
 
 
 # ── Roadmap edits (frontend node editing → DB sync) ────────────────────────────

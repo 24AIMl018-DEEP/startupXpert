@@ -87,10 +87,16 @@ async def run_roadmap_pipeline(
                 summary=     r.get("summary"),
             )
             if branch_db_id and r.get("tasks"):
-                write_tasks(branch_db_id, [
+                task_list = [
                     {**t, "task_id": f"{r['branch']}_task_{i:02d}"}
                     for i, t in enumerate(r["tasks"])
-                ])
+                ]
+                db_id_map = {
+                    item["task_id"]: item["db_id"]
+                    for item in write_tasks(branch_db_id, task_list)
+                }
+                # Store task_id → db_id map so synced_tasks can reference it
+                r["_task_db_ids"] = db_id_map
 
         branch_db_id_map[r["branch"]] = branch_db_id
 
@@ -101,6 +107,11 @@ async def run_roadmap_pipeline(
             summary= r.get("summary"),
             db_id=   branch_db_id,   # DB uuid so frontend can sync branch edits
         ))
+
+    # Build a flat task_id → db_id map across all branches
+    all_task_db_ids: Dict[str, Optional[str]] = {}
+    for r in final_state["branch_results"]:
+        all_task_db_ids.update(r.get("_task_db_ids", {}))
 
     synced_tasks = [
         SyncedTask(
@@ -115,7 +126,7 @@ async def run_roadmap_pipeline(
             estimated_hours= t.get("estimated_hours"),
             complexity=      t.get("complexity"),
             cost_impact=     t.get("cost_impact"),
-            db_id=           None,   # synced_tasks come from graph state, no direct DB id here
+            db_id=           all_task_db_ids.get(t["task_id"]),  # real DB uuid
             status=          t.get("status", "Ready"),
             blocked_by=      t.get("blocked_by", []),
             unblocks=        t.get("unblocks", []),

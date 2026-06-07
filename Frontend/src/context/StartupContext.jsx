@@ -83,7 +83,16 @@ export const StartupProvider = ({ children }) => {
     }
     return [];
   });
-  const [roadmapData, setRoadmapData]   = useState(null);  // full backend roadmap response
+  const [roadmapData, setRoadmapData]   = useState(() => {
+    // Restore full roadmap backend response from localStorage on mount
+    const savedUser = localStorage.getItem('startup_user') || localStorage.getItem('startupxpert_user');
+    const parsedUser = savedUser ? JSON.parse(savedUser) : null;
+    if (parsedUser?.email) {
+      const saved = localStorage.getItem(`startup_roadmap_data_${parsedUser.email}`);
+      return saved ? JSON.parse(saved) : null;
+    }
+    return null;
+  });  // full backend roadmap response
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
 
   // Auto-save roadmap to localStorage
@@ -96,6 +105,17 @@ export const StartupProvider = ({ children }) => {
       }
     }
   }, [roadmapNodes, user?.email]);
+
+  // Auto-save full roadmap data response to localStorage
+  useEffect(() => {
+    if (user?.email) {
+      if (roadmapData) {
+        localStorage.setItem(`startup_roadmap_data_${user.email}`, JSON.stringify(roadmapData));
+      } else {
+        localStorage.removeItem(`startup_roadmap_data_${user.email}`);
+      }
+    }
+  }, [roadmapData, user?.email]);
 
   // 3. Onboarding Role Setup (Step 1)
   const [onboardingRole, setOnboardingRole] = useState({
@@ -245,6 +265,9 @@ export const StartupProvider = ({ children }) => {
     localStorage.removeItem('startup_user');
     localStorage.removeItem('startupxpert_user');
     localStorage.removeItem('startup_roadmap');
+    if (user?.email) {
+      localStorage.removeItem(`startup_roadmap_data_${user.email}`);
+    }
 
     // Reset roadmap
     setRoadmapNodes([]);
