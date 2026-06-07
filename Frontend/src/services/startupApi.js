@@ -35,6 +35,19 @@ export async function fetchUserSessions(userId) {
   return res.json();
 }
 
+// Check if user already has a completed validation session (used on login to skip onboarding)
+export async function fetchLatestSession(userId) {
+  const headers = await getAuthHeaders();
+  try {
+    const res = await fetch(`${VALIDATION_URL}/api/v1/sessions/${userId}/latest`, { headers });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.found ? data.session : null;
+  } catch {
+    return null;
+  }
+}
+
 // ── Roadmap Module ────────────────────────────────────────────────────────────
 
 export async function submitRoadmap(sessionId, team = []) {

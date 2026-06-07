@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import InputField from '../components/InputField';
 import { Lock, Mail, ArrowRight, Sparkles, AlertCircle } from 'lucide-react';
 import { signInUser } from '../services/authService';
+import { fetchLatestSession } from '../services/startupApi';
 
 const Login = () => {
   const { loginUser, isLoggedIn, user, setLoading } = useStartup();
@@ -75,17 +76,35 @@ const Login = () => {
 
     try {
       const data = await signInUser(formData.email, formData.password);
+      const supabaseUserId = data.user?.id || null;
       const fullName =
         data.user?.user_metadata?.full_name ||
         formData.email.split('@')[0].replace(/^./, (c) => c.toUpperCase());
-      // Pass the Supabase UUID so ideas are linked to this account
-      loginUser(formData.email, formData.password, fullName, data.user?.id || null);
 
-      // Onboarding not complete → send to onboarding, else dashboard
+      // Pass the Supabase UUID so ideas are linked to this account
+      loginUser(formData.email, formData.password, fullName, supabaseUserId);
+
+      // Check if user already has a completed validation session in DB
+      // If yes → skip onboarding entirely, restore session_id, go to dashboard
+      if (supabaseUserId) {
+        const existingSession = await fetchLatestSession(supabaseUserId);
+        if (existingSession?.id) {
+          // Store session_id scoped to this user so roadmap can use it
+          localStorage.setItem(`validation_session_id_${formData.email}`, existingSession.id);
+          // Mark onboarding as completed
+          const prevUser = localStorage.getItem(`startup_user_${formData.email}`);
+          const parsed = prevUser ? JSON.parse(prevUser) : {};
+          const updated = { ...parsed, onboardingCompleted: true, isNewUser: false };
+          localStorage.setItem(`startup_user_${formData.email}`, JSON.stringify(updated));
+          localStorage.setItem('startup_user', JSON.stringify(updated));
+          navigate('/dashboard', { replace: true });
+          return;
+        }
+      }
+
+      // No existing session — check local history as fallback
       const savedHistory = localStorage.getItem(`startup_history_${formData.email}`) || localStorage.getItem('startup_history');
       const hasHistory = savedHistory ? JSON.parse(savedHistory).length > 0 : false;
-
-      // Also check if onboarding flag was previously saved for this user
       const prevUser = localStorage.getItem(`startup_user_${formData.email}`);
       const wasCompleted = prevUser ? JSON.parse(prevUser)?.onboardingCompleted === true : false;
 

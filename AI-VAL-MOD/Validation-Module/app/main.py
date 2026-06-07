@@ -121,6 +121,44 @@ def get_user_sessions(user_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/api/v1/sessions/{user_id}/latest")
+def get_latest_session(user_id: str):
+    """Return the most recent validated session for a user (pipeline_output exists)."""
+    try:
+        from shared.db.supabase_client import get_supabase
+        db = get_supabase()
+        # Get all sessions for user
+        sessions = db.table("startup_input") \
+            .select("id, created_at, startup_name, startup_domain") \
+            .eq("user_id", user_id) \
+            .order("created_at", desc=True) \
+            .execute().data or []
+        if not sessions:
+            return {"found": False, "session": None}
+        # Find the latest one that has a pipeline_output (completed validation)
+        ids = [s["id"] for s in sessions]
+        po = db.table("pipeline_output") \
+            .select("session_id, aggregate_validation_score, status") \
+            .in_("session_id", ids) \
+            .order("created_at", desc=True) \
+            .limit(1) \
+            .execute().data or []
+        if not po:
+            return {"found": False, "session": None}
+        session_id = po[0]["session_id"]
+        session = next((s for s in sessions if s["id"] == session_id), None)
+        return {
+            "found": True,
+            "session": {
+                **session,
+                "aggregate_validation_score": po[0].get("aggregate_validation_score"),
+                "status": po[0].get("status"),
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/v1/vector/search")
 def vector_search(query: str, top_k: int = 5, agent: str = None):
     return {"query": query, "results": vector_store.search(query=query, top_k=top_k, agent_filter=agent)}

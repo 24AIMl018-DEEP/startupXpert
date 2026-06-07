@@ -112,15 +112,25 @@ def _is_rate_limit(err: Exception) -> bool:
 
 _TIER_NAMES = {1: "Ollama (local)", 2: "Groq", 3: "NVIDIA"}
 
+# On daily quota exhausted, skip retries and go straight to Ollama
+_QUOTA_ERRORS = ("tokens per day", "daily", "tpd", "quota")
+
+def _is_quota_exhausted(err: Exception) -> bool:
+    s = str(err).lower()
+    return any(q in s for q in _QUOTA_ERRORS)
+
 def call_llm_with_fallback(prompt: str, tier: int, temperature: float = None) -> str:
     temp = temperature if temperature is not None else Config.DEFAULT_TEMPERATURE
     tiers_to_try = list(dict.fromkeys([tier] + list(range(tier - 1, 0, -1))))
 
     last_err = None
     for current_tier in tiers_to_try:
-        for attempt, delay in enumerate([0] + _RETRY_DELAYS):
+        # For Ollama (tier 1) — no retries, just one attempt
+        retry_delays = [] if current_tier == 1 else _RETRY_DELAYS
+
+        for attempt, delay in enumerate([0] + retry_delays):
             if delay:
-                print(f"[LLM] Retry {attempt} after {delay}s (tier={current_tier} {_TIER_NAMES.get(current_tier)})...")
+                print(f"[LLM] Retry {attempt} after {delay}s ({_TIER_NAMES.get(current_tier)})...")
                 time.sleep(delay)
             try:
                 t_start = time.time()
@@ -135,10 +145,20 @@ def call_llm_with_fallback(prompt: str, tier: int, temperature: float = None) ->
             except Exception as e:
                 last_err = e
                 print(f"[LLM] ✗ {_TIER_NAMES.get(current_tier)} error: {str(e)[:120]}")
-                if not _is_rate_limit(e):
+                # If daily quota exhausted → skip ALL retries, jump straight to Ollama
+                if _is_quota_exhausted(e):
+                    print(f"[LLM] Daily quota exhausted on {_TIER_NAMES.get(current_tier)} → falling back to Ollama immediately")
+                    tiers_to_try = [1]  # only Ollama remaining
                     break
+                if not _is_rate_limit(e):
+                    break  # non-rate-limit error → skip retries, try next tier
 
         print(f"[LLM] {_TIER_NAMES.get(current_tier)} exhausted → trying next fallback...")
+
+    raise RuntimeError(
+        f"[LLM] All tiers exhausted (tried {[_TIER_NAMES.get(t) for t in tiers_to_try]}). "
+        f"Last error: {last_err}"
+    )
 
     raise RuntimeError(
         f"[LLM] All tiers exhausted (tried {[_TIER_NAMES.get(t) for t in tiers_to_try]}). "
