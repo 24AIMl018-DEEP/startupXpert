@@ -58,5 +58,14 @@ export async function signInUser(email, password) {
     throw new Error(parseAuthError(error));
   }
 
+  // Upsert profile on every login — ensures profile row always exists
+  const user = data.user;
+  if (user?.id) {
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .upsert([{ id: user.id, full_name: user.user_metadata?.full_name || '' }], { onConflict: 'id' });
+    if (profileError) console.warn('Profile upsert warning:', profileError.message);
+  }
+
   return data;
-}
+}
