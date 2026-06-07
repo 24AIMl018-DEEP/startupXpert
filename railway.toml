@@ -1,6 +1,6 @@
 [build]
 builder = "dockerfile"
-dockerfilePath = "AI-VAL-MOD/Dockerfile.validation"
+dockerfilePath = "AI-VAL-MOD/Dockerfile"
 
 [deploy]
 healthcheckPath = "/health"
