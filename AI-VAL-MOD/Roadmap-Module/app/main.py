@@ -10,11 +10,11 @@ sys.path.insert(0, str(_here.parent))       # Roadmap-Module/app
 sys.path.insert(0, str(_here.parents[2]))   # AI-VAL-MOD (shared lives here)
 
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from fastapi import Request
+from fastapi import Depends
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 
@@ -38,19 +38,46 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Startup Roadmap Generator", version="2.0.0")
-# Direct, strict, aur fail-proof CORS policy
+
+# ─── 1. STANDARD CORS MIDDLEWARE ──────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://startup-xpert.vercel.app",  # Production frontend
-        "http://localhost:3000",             # Localhost React/Next
-        "http://localhost:5173",             # Localhost Vite
-        "http://localhost:5174",             # Localhost Vite fallback port
+        "https://startup-xpert.vercel.app",
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://localhost:5174",
     ],
     allow_credentials=True,
-    allow_methods=["*"],     # Allow all methods (GET, POST, PATCH, etc.)
-    allow_headers=["*"],     # Allow all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
+
+
+# ─── 2. GOD-MODE CORS MIDDLEWARE (Preflight + Crash Safety) ───────────────────
+@app.middleware("http")
+async def force_cors_headers(request: Request, call_next):
+    """
+    Forces CORS headers on EVERY response — even crashes and Railway proxy drops.
+    Handles OPTIONS preflight directly so it never hits broken routes.
+    """
+    if request.method == "OPTIONS":
+        response = Response(status_code=200)
+    else:
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            logger.error(f"[Middleware] Unhandled crash: {e}")
+            response = JSONResponse(status_code=500, content={"detail": str(e)})
+
+    origin = request.headers.get("origin")
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "*"
+        response.headers["Access-Control-Max-Age"] = "86400"
+    return response
 
 
 @app.exception_handler(RequestValidationError)
