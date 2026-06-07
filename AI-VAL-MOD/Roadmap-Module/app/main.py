@@ -38,23 +38,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="AI Startup Roadmap Generator", version="2.0.0")
-ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
-if "*" in ALLOWED_ORIGINS:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origin_regex=r".*",
-        allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-else:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=ALLOWED_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# Direct, strict, aur fail-proof CORS policy
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://startup-xpert.vercel.app",  # Production frontend
+        "http://localhost:3000",             # Localhost React/Next
+        "http://localhost:5173",             # Localhost Vite
+        "http://localhost:5174",             # Localhost Vite fallback port
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],     # Allow all methods (GET, POST, PATCH, etc.)
+    allow_headers=["*"],     # Allow all headers
+)
 
 
 @app.exception_handler(RequestValidationError)
