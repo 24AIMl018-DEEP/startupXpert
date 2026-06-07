@@ -1,10 +1,10 @@
 from typing import Dict, List, Tuple
-from services.vector.store import vector_store
 
 MIN_SCORE = 0.30  # chunks below this are noise, skip them
 
 
 def build_vector_context(name: str, vector_queries: List[str], top_k: int, startup_data: Dict) -> Tuple[str, List[Dict]]:
+    from services.vector.store import vector_store
     flat = {k: (", ".join(v) if isinstance(v, list) else str(v)) for k, v in startup_data.items()}
     seen, all_docs = set(), []
 

@@ -15,7 +15,6 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from schema.startup_input import StartupInput
-from services.vector.store import vector_store
 from workflow.graph import run_pipeline
 
 logging.basicConfig(
@@ -27,12 +26,12 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Warm up sentence-transformer model in background — don't block startup
     import asyncio
     async def _warmup():
         try:
             logger.info("[Startup] Warming up vector store model (background)...")
-            await asyncio.get_event_loop().run_in_executor(None, lambda: (
+            from services.vector.store import vector_store
+            await asyncio.get_running_loop().run_in_executor(None, lambda: (
                 vector_store.add("warmup", {"agent": "warmup"}),
                 vector_store.clear()
             ))
@@ -192,15 +191,18 @@ def get_latest_session(user_id: str, current_user=Depends(get_current_user)):
 
 @app.get("/api/v1/vector/search")
 def vector_search(query: str, top_k: int = 5, agent: str = None):
+    from services.vector.store import vector_store
     return {"query": query, "results": vector_store.search(query=query, top_k=top_k, agent_filter=agent)}
 
 
 @app.get("/api/v1/vector/stats")
 def vector_stats():
+    from services.vector.store import vector_store
     return vector_store.stats()
 
 
 @app.delete("/api/v1/vector/clear")
 def vector_clear():
+    from services.vector.store import vector_store
     vector_store.clear()
     return {"status": "cleared"}

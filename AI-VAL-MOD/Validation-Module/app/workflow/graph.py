@@ -10,7 +10,6 @@ from schema.states.analysis_state import (
     AnalysisPhaseState, FeasibilityResult, MarketOpportunityResult,
     CompetitionResult, RiskResult, InnovationUSPResult, CriticalRisk,
 )
-from services.vector.store import vector_store
 from services.db.db_service import (
     save_startup_input,
     save_pitch_phase,
@@ -76,6 +75,7 @@ _graph = _build_graph()
 
 
 async def run_pipeline(startup_data: StartupInput) -> PipelineState:
+    from services.vector.store import vector_store as _vector_store
     print(f"\n{'='*60}\n[Pipeline] START — {startup_data.startup_name}\n{'='*60}")
 
     # ── Phase 0: save startup_input, get session_id ────────────────────────────
@@ -124,7 +124,7 @@ async def run_pipeline(startup_data: StartupInput) -> PipelineState:
             duplicates_dropped = 0,
             status             = r["status"],
         ) for r in qr],
-        total_docs_indexed = vector_store.stats()["total_docs"],
+        total_docs_indexed = _vector_store.stats()["total_docs"],
     )
     if session_id:
         try:
@@ -215,7 +215,7 @@ async def run_pipeline(startup_data: StartupInput) -> PipelineState:
         query_phase_state          = query_phase_state,
         analysis_phase_state       = analysis_phase_state,
         aggregate_validation_score = aggregate,
-        final_vector_stats         = vector_store.stats(),
+        final_vector_stats         = _vector_store.stats(),
     )
 
     if session_id:

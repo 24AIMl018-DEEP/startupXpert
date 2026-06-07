@@ -159,8 +159,3 @@ def call_llm_with_fallback(prompt: str, tier: int, temperature: float = None) ->
         f"[LLM] All tiers exhausted (tried {[_TIER_NAMES.get(t) for t in tiers_to_try]}). "
         f"Last error: {last_err}"
     )
-
-    raise RuntimeError(
-        f"[LLM] All tiers exhausted (tried {[_TIER_NAMES.get(t) for t in tiers_to_try]}). "
-        f"Last error: {last_err}"
-    )

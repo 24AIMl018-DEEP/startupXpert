@@ -1,8 +1,8 @@
 from typing import Dict, List
-from services.vector.store import vector_store
 
 
 def index_pitch(pitch: str, startup_name: str):
+    from services.vector.store import vector_store
     """Index the generated pitch text."""
     vector_store.add(
         text=pitch,
@@ -11,6 +11,7 @@ def index_pitch(pitch: str, startup_name: str):
 
 
 def index_startup_json(data: Dict) -> int:
+    from services.vector.store import vector_store
     """Index key startup fields as searchable text chunks. Returns count added."""
     startup_name = data.get("startup_name", "")
     platform_str = ", ".join(data.get("platform_type", [])) if isinstance(data.get("platform_type"), list) else str(data.get("platform_type", ""))
@@ -31,6 +32,7 @@ def index_startup_json(data: Dict) -> int:
 
 
 def index_agent_results(agent_name: str, startup_name: str, results: List[Dict]):
+    from services.vector.store import vector_store
     """Index search results from an agent."""
     items = []
     for r in results:

@@ -13,10 +13,17 @@ class VectorStore:
     """
 
     def __init__(self, model_name: str = "all-MiniLM-L6-v2"):
-        self.model = SentenceTransformer(model_name)
+        self._model_name = model_name
+        self._model: Optional[SentenceTransformer] = None  # lazy-loaded
         self._docs: List[Dict] = []           # raw docs with metadata
         self._embeddings: List[np.ndarray] = []
         self._hashes: set = set()             # for dedup
+
+    @property
+    def model(self) -> SentenceTransformer:
+        if self._model is None:
+            self._model = SentenceTransformer(self._model_name)
+        return self._model
 
     def _hash(self, text: str) -> str:
         return hashlib.md5(text.strip().lower().encode()).hexdigest()
