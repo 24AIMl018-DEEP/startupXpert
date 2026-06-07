@@ -49,9 +49,7 @@ export const StartupProvider = ({ children }) => {
     }
   }, [isLoggedIn]);
 
-  const [isLoggedIn, setIsLoggedIn] = useState(() => {
-    return localStorage.getItem('isLoggedIn') === 'true';
-  });
+
 
   // 2. Settings State (persisted under startup_settings)
   const [settings, setSettings] = useState(() => {
