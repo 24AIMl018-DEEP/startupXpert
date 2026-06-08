@@ -47,26 +47,46 @@ export async function checkUserHasValidation(userId) {
           score:         data.session?.aggregate_validation_score || null,
         };
       }
+      return { hasValidation: false, sessionId: null, startupName: null };
     }
-    // Fallback: check profiles.last_session_id in Supabase directly
-    const { supabase } = await import('./supabase');
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('last_session_id, last_startup_name')
-      .eq('id', userId)
-      .single();
-    if (profile?.last_session_id) {
-      return {
-        hasValidation: true,
-        sessionId:     profile.last_session_id,
-        startupName:   profile.last_startup_name || null,
-        score:         null,
-      };
-    }
-    return { hasValidation: false, sessionId: null, startupName: null };
-  } catch {
-    return { hasValidation: false, sessionId: null, startupName: null };
+  } catch (err) {
+    console.warn('[Validation] API unreachable, falling back to direct DB query.');
   }
+
+  // Fallback: Query Supabase directly
+  try {
+    const { supabase } = await import('./supabase');
+    const { data: sessions } = await supabase
+      .from('startup_input')
+      .select('id, startup_name')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (sessions && sessions.length > 0) {
+      const ids = sessions.map(s => s.id);
+      const { data: pipelines } = await supabase
+        .from('pipeline_output')
+        .select('session_id, aggregate_validation_score')
+        .in('session_id', ids)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (pipelines && pipelines.length > 0) {
+        const p = pipelines[0];
+        const s = sessions.find(x => x.id === p.session_id);
+        return {
+          hasValidation: true,
+          sessionId:     p.session_id,
+          startupName:   s?.startup_name || null,
+          score:         p.aggregate_validation_score || null,
+        };
+      }
+    }
+  } catch (dbErr) {
+    console.error('[Validation] DB Fallback failed:', dbErr);
+  }
+
+  return { hasValidation: false, sessionId: null, startupName: null };
 }
 
 // Fetch all sessions for a user (for dashboard history display)
@@ -75,9 +95,22 @@ export async function fetchUserSessions(userId) {
   const headers = await getAuthHeaders();
   try {
     const res = await fetch(`${VALIDATION_URL}/api/v1/sessions/${userId}`, { headers });
-    if (!res.ok) return [];
-    return res.json();
-  } catch {
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn('[Validation] API unreachable for history, falling back to direct DB query.');
+  }
+
+  // Fallback: Query Supabase directly
+  try {
+    const { supabase } = await import('./supabase');
+    const { data: sessions } = await supabase
+      .from('startup_input')
+      .select('id, created_at, startup_name, startup_domain, current_startup_stage')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    return sessions || [];
+  } catch (dbErr) {
+    console.error('[Validation] History DB Fallback failed:', dbErr);
     return [];
   }
 }
@@ -123,12 +156,49 @@ export async function fetchLatestValidatedSession(userId) {
   const headers = await getAuthHeaders();
   try {
     const res = await fetch(`${ROADMAP_URL}/api/v1/sessions/${userId}/latest`, { headers });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.found ? data.session : null;
-  } catch {
-    return null;
+    if (res.ok) {
+      const data = await res.json();
+      return data.found ? data.session : null;
+    }
+  } catch (err) {
+    console.warn('[Roadmap] API unreachable, falling back to direct DB query.');
   }
+
+  // Fallback: Query Supabase directly
+  try {
+    const { supabase } = await import('./supabase');
+    const { data: sessions } = await supabase
+      .from('startup_input')
+      .select('id, created_at, startup_name, startup_domain, current_startup_stage')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (sessions && sessions.length > 0) {
+      const ids = sessions.map(s => s.id);
+      const { data: pipelines } = await supabase
+        .from('pipeline_output')
+        .select('session_id, aggregate_validation_score, status, created_at')
+        .in('session_id', ids)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (pipelines && pipelines.length > 0) {
+        const po = pipelines[0];
+        const s = sessions.find(x => x.id === po.session_id);
+        if (s) {
+          return {
+            ...s,
+            aggregate_validation_score: po.aggregate_validation_score,
+            status: po.status
+          };
+        }
+      }
+    }
+  } catch (dbErr) {
+    console.error('[Roadmap] DB Fallback failed:', dbErr);
+  }
+
+  return null;
 }
 
 // Fetch all validated sessions (for dashboard list)

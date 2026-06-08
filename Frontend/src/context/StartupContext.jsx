@@ -1,4 +1,4 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { useToast } from './ToastContext';
 import { submitValidation, submitRoadmap, patchBranch, patchTask } from '../services/startupApi';
 import { getCurrentUserId } from '../services/authService';
@@ -63,10 +63,27 @@ export const StartupProvider = ({ children }) => {
     };
   });
 
-  // Roadmap State — always fetched from DB, never localStorage
-  const [roadmapNodes, setRoadmapNodes] = useState([]);
-  const [roadmapData, setRoadmapData]   = useState(null);
+  // Roadmap State — persisted to sessionStorage so refresh keeps them
+  const [roadmapNodes, setRoadmapNodesRaw] = useState(() => {
+    try { const s = sessionStorage.getItem('sx_roadmap_nodes'); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const [roadmapData, setRoadmapDataRaw] = useState(() => {
+    try { const s = sessionStorage.getItem('sx_roadmap_data'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
+
+  // Wrapped roadmap setters
+  const setRoadmapNodes = (val) => {
+    setRoadmapNodesRaw(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+  const setRoadmapData = (val) => {
+    setRoadmapDataRaw(val);
+    try { if (val) sessionStorage.setItem('sx_roadmap_data', JSON.stringify(val)); else sessionStorage.removeItem('sx_roadmap_data'); } catch {}
+  };
 
   // 3. Onboarding Role Setup (Step 1)
   const [onboardingRole, setOnboardingRole] = useState({
@@ -81,31 +98,42 @@ export const StartupProvider = ({ children }) => {
     founderSkillset: [],
   });
 
-  // 4. Onboarding Startup Details (Step 2 - 17 Fields)
-  const [startupDetails, setStartupDetails] = useState({
-    startupName: '',
-    startupDomain: '',
-    problemStatement: '',
-    startupDescription: '',
-    targetAudience: '',
-    geographicMarket: '',
-    existingCompetitors: '',
-    revenueModel: '',
-    estimatedPricing: '',
-    availableFunding: '',
-    monthlyBurnCapacity: '',
-    platformType: [],
-    techComplexity: '',
-    mvpTimeline: '',
-    scalabilityGoal: '',
-    acquisitionStrategy: '',
-    startupStage: '',
+  // 4. Onboarding Startup Details — persisted to sessionStorage
+  const _detailsDefault = {
+    startupName: '', startupDomain: '', problemStatement: '', startupDescription: '',
+    targetAudience: '', geographicMarket: '', existingCompetitors: '', revenueModel: '',
+    estimatedPricing: '', availableFunding: '', monthlyBurnCapacity: '', platformType: [],
+    techComplexity: '', mvpTimeline: '', scalabilityGoal: '', acquisitionStrategy: '', startupStage: '',
+  };
+  const [startupDetails, setStartupDetailsRaw] = useState(() => {
+    try { const s = sessionStorage.getItem('sx_startup_details'); return s ? { ..._detailsDefault, ...JSON.parse(s) } : _detailsDefault; } catch { return _detailsDefault; }
   });
+  const setStartupDetails = (valOrFn) => {
+    setStartupDetailsRaw(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      try { sessionStorage.setItem('sx_startup_details', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
-  // 5. Analysis Scores (Step 3)
-  const [analysisScores, setAnalysisScores] = useState(null);
-  const [fullAnalysisData, setFullAnalysisData] = useState(null); // complete backend response
+  // 5. Analysis Scores — persisted in sessionStorage (survives reload, cleared on tab close)
+  const [analysisScores, setAnalysisScoresRaw] = useState(() => {
+    try { const s = sessionStorage.getItem('sx_scores'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
+  const [fullAnalysisData, setFullAnalysisDataRaw] = useState(() => {
+    try { const s = sessionStorage.getItem('sx_analysis'); return s ? JSON.parse(s) : null; } catch { return null; }
+  });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Wrapped setters that also persist to sessionStorage
+  const setAnalysisScores = (val) => {
+    setAnalysisScoresRaw(val);
+    try { if (val) sessionStorage.setItem('sx_scores', JSON.stringify(val)); else sessionStorage.removeItem('sx_scores'); } catch {}
+  };
+  const setFullAnalysisData = (val) => {
+    setFullAnalysisDataRaw(val);
+    try { if (val) sessionStorage.setItem('sx_analysis', JSON.stringify(val)); else sessionStorage.removeItem('sx_analysis'); } catch {}
+  };
 
   // 6. History — loaded from DB after login, never from localStorage
   const [analysisHistory, setAnalysisHistory] = useState([]);
@@ -125,20 +153,31 @@ export const StartupProvider = ({ children }) => {
     }
   }, []);
 
-  // When user changes — reset state (DB will reload as needed)
+  // Track previous email to detect genuine account switches (not initial mount)
+  const prevEmailRef = useRef(null);
   useEffect(() => {
-    if (user?.email) {
-      // Only draft check from localStorage — everything else from DB
-      const savedDraft = localStorage.getItem(`startup_draft_${user.email}`);
-      setResumeState(!!savedDraft);
-      // Reset roadmap/history — will be loaded from DB on demand
-      setRoadmapNodes([]);
-      setRoadmapData(null);
+    const prev = prevEmailRef.current;
+    prevEmailRef.current = user?.email || null;
+    // On initial mount, prev is null — don't wipe sessionStorage data
+    if (prev === null) {
+      if (user?.email) {
+        const savedDraft = localStorage.getItem(`startup_draft_${user.email}`);
+        setResumeState(!!savedDraft);
+      }
+      return;
+    }
+    // Genuine account switch — clear everything
+    if (user?.email !== prev) {
+      setRoadmapNodesRaw([]);
+      setRoadmapDataRaw(null);
       setAnalysisHistory([]);
-    } else {
-      setAnalysisHistory([]);
-      setRoadmapNodes([]);
-      setResumeState(false);
+      try { sessionStorage.removeItem('sx_roadmap_nodes'); sessionStorage.removeItem('sx_roadmap_data'); sessionStorage.removeItem('sx_scores'); sessionStorage.removeItem('sx_analysis'); sessionStorage.removeItem('sx_startup_details'); } catch {}
+      if (user?.email) {
+        const savedDraft = localStorage.getItem(`startup_draft_${user.email}`);
+        setResumeState(!!savedDraft);
+      } else {
+        setResumeState(false);
+      }
     }
   }, [user?.email]);
 
@@ -190,11 +229,13 @@ export const StartupProvider = ({ children }) => {
     if (user?.email) {
       localStorage.removeItem(`startup_draft_${user.email}`);
     }
-    setRoadmapNodes([]);
-    setRoadmapData(null);
-    setAnalysisScores(null);
+    setRoadmapNodesRaw([]);
+    setRoadmapDataRaw(null);
+    setAnalysisScoresRaw(null);
+    setFullAnalysisDataRaw(null);
     setAnalysisHistory([]);
     setResumeState(false);
+    try { sessionStorage.removeItem('sx_roadmap_nodes'); sessionStorage.removeItem('sx_roadmap_data'); sessionStorage.removeItem('sx_scores'); sessionStorage.removeItem('sx_analysis'); sessionStorage.removeItem('sx_startup_details'); } catch {}
     setOnboardingRole({ fullName: '', age: '', gender: '', city: '', country: '', profession: '', experience: '', founderCount: '', founderSkillset: [] });
     setStartupDetails({ startupName: '', startupDomain: '', problemStatement: '', startupDescription: '', targetAudience: '', geographicMarket: '', existingCompetitors: '', revenueModel: '', estimatedPricing: '', availableFunding: '', monthlyBurnCapacity: '', platformType: [], techComplexity: '', mvpTimeline: '', scalabilityGoal: '', acquisitionStrategy: '', startupStage: '' });
     setUser({ fullName: '', email: '', role: 'Founder', avatarUrl: '' });
@@ -408,7 +449,11 @@ export const StartupProvider = ({ children }) => {
   };
 
   const updateRoadmapNode = (id, updatedFields) => {
-    setRoadmapNodes(prev => prev.map(node => node.id === id ? { ...node, ...updatedFields } : node));
+    setRoadmapNodesRaw(prev => {
+      const updated = prev.map(node => node.id === id ? { ...node, ...updatedFields } : node);
+      try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
 
     // Sync branch-level edits to Supabase if node has a DB id (branch-*)
     // branchDbId is stored on the node when roadmap is built from backend
@@ -593,19 +638,6 @@ export const StartupProvider = ({ children }) => {
 
       const result = await submitValidation(payload);
 
-      // Save session_id to Supabase profiles so it persists across sessions
-      if (result?.session_id && userId) {
-        try {
-          const { supabase } = await import('../services/supabase');
-          await supabase.from('profiles').upsert({
-            id: userId,
-            last_session_id:   result.session_id,
-            last_startup_name: details.startupName || '',
-          }, { onConflict: 'id' });
-        } catch (e) {
-          console.warn('[Profile] session_id save failed:', e.message);
-        }
-      }
 
       const ap = result?.analysis_phase_state || {};
       const scores = {
@@ -662,7 +694,9 @@ export const StartupProvider = ({ children }) => {
       const result = await submitRoadmap(sessionId, team);
       setRoadmapData(result);
       const nodes = _buildRoadmapNodes(result);
-      setRoadmapNodes(nodes);
+      setRoadmapNodesRaw(nodes);
+      setRoadmapDataRaw(result);
+      try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(nodes)); sessionStorage.setItem('sx_roadmap_data', JSON.stringify(result)); } catch {}
       showToast('Roadmap generated successfully!', 'success');
       return result;
     } catch (err) {
@@ -739,10 +773,12 @@ export const StartupProvider = ({ children }) => {
   }
 
   const dashboardStats = {
-    totalStartups: analysisHistory.length,
-    completedAnalysis: analysisHistory.filter((h) => h.scores).length,
-    savedDraftCount: resumeState ? 1 : 0,
-    roadmapProgress: analysisHistory.length > 0 ? '4 / 10' : '0 / 10',
+    totalStartups:     analysisHistory.length,
+    completedAnalysis: analysisHistory.filter(h => h.isValidated || h.scores).length,
+    savedDraftCount:   resumeState ? 1 : 0,
+    roadmapProgress:   roadmapNodes.filter(n => n.parentId === 'root').length > 0
+      ? `${roadmapNodes.filter(n => n.tasks?.some(t => t.completed)).length} / ${roadmapNodes.filter(n => n.parentId === 'root').length}`
+      : '0 / 0',
   };
 
   // Helper: Get Name Initials

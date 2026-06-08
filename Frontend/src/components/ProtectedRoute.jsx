@@ -42,11 +42,11 @@ const ProtectedRoute = ({
     return <Navigate to="/onboarding/role" replace />;
   }
 
-  // Gate 3 — analysis result page requires scores to be present
+  // Gate 3 — analysis result page: check context OR sessionStorage (handles refresh)
   if (requireAnalysis) {
-    const hasDetails = startupDetails?.startupName;
-    const hasScores  = !!analysisScores;
-    if (!hasDetails || !hasScores) {
+    const hasScores = !!analysisScores;
+    const hasCached = (() => { try { return !!sessionStorage.getItem('sx_scores'); } catch { return false; } })();
+    if (!hasScores && !hasCached) {
       return <Navigate to="/startup/validate" replace />;
     }
   }
