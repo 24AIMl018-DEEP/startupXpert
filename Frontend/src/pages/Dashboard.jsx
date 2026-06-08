@@ -466,7 +466,7 @@ const Dashboard = () => {
         </div>
       )}
     </DashboardLayout>
-x  );
+  );
 };
 
 export default Dashboard;
