@@ -42,13 +42,11 @@ const ProtectedRoute = ({
     return <Navigate to="/onboarding/role" replace />;
   }
 
-  // Gate 3 — analysis result page: redirect to validate only if truly no data at all
-  if (requireAnalysis && !analysisScores) {
-    // Check sessionStorage directly in case context hasn't rehydrated yet
-    try {
-      const cached = sessionStorage.getItem('analysis_scores');
-      if (!cached) return <Navigate to="/startup/validate" replace />;
-    } catch {
+  // Gate 3 — analysis result page: check context OR sessionStorage (handles refresh)
+  if (requireAnalysis) {
+    const hasScores = !!analysisScores;
+    const hasCached = (() => { try { return !!sessionStorage.getItem('sx_scores'); } catch { return false; } })();
+    if (!hasScores && !hasCached) {
       return <Navigate to="/startup/validate" replace />;
     }
   }

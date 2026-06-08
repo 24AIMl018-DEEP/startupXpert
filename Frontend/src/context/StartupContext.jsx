@@ -63,14 +63,27 @@ export const StartupProvider = ({ children }) => {
     };
   });
 
-  // Roadmap State — persisted to sessionStorage so refresh doesn't blank the page
-  const [roadmapNodes, setRoadmapNodes] = useState(() => {
-    try { const s = sessionStorage.getItem('roadmap_nodes'); return s ? JSON.parse(s) : []; } catch { return []; }
+  // Roadmap State — persisted to sessionStorage so refresh keeps them
+  const [roadmapNodes, setRoadmapNodesRaw] = useState(() => {
+    try { const s = sessionStorage.getItem('sx_roadmap_nodes'); return s ? JSON.parse(s) : []; } catch { return []; }
   });
-  const [roadmapData, setRoadmapData] = useState(() => {
-    try { const s = sessionStorage.getItem('roadmap_data'); return s ? JSON.parse(s) : null; } catch { return null; }
+  const [roadmapData, setRoadmapDataRaw] = useState(() => {
+    try { const s = sessionStorage.getItem('sx_roadmap_data'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
+
+  // Wrapped roadmap setters
+  const setRoadmapNodes = (val) => {
+    setRoadmapNodesRaw(prev => {
+      const next = typeof val === 'function' ? val(prev) : val;
+      try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+  const setRoadmapData = (val) => {
+    setRoadmapDataRaw(val);
+    try { if (val) sessionStorage.setItem('sx_roadmap_data', JSON.stringify(val)); else sessionStorage.removeItem('sx_roadmap_data'); } catch {}
+  };
 
   // 3. Onboarding Role Setup (Step 1)
   const [onboardingRole, setOnboardingRole] = useState({
@@ -85,35 +98,42 @@ export const StartupProvider = ({ children }) => {
     founderSkillset: [],
   });
 
-  // 4. Onboarding Startup Details (Step 2 - 17 Fields)
-  const [startupDetails, setStartupDetails] = useState({
-    startupName: '',
-    startupDomain: '',
-    problemStatement: '',
-    startupDescription: '',
-    targetAudience: '',
-    geographicMarket: '',
-    existingCompetitors: '',
-    revenueModel: '',
-    estimatedPricing: '',
-    availableFunding: '',
-    monthlyBurnCapacity: '',
-    platformType: [],
-    techComplexity: '',
-    mvpTimeline: '',
-    scalabilityGoal: '',
-    acquisitionStrategy: '',
-    startupStage: '',
+  // 4. Onboarding Startup Details — persisted to sessionStorage
+  const _detailsDefault = {
+    startupName: '', startupDomain: '', problemStatement: '', startupDescription: '',
+    targetAudience: '', geographicMarket: '', existingCompetitors: '', revenueModel: '',
+    estimatedPricing: '', availableFunding: '', monthlyBurnCapacity: '', platformType: [],
+    techComplexity: '', mvpTimeline: '', scalabilityGoal: '', acquisitionStrategy: '', startupStage: '',
+  };
+  const [startupDetails, setStartupDetailsRaw] = useState(() => {
+    try { const s = sessionStorage.getItem('sx_startup_details'); return s ? { ..._detailsDefault, ...JSON.parse(s) } : _detailsDefault; } catch { return _detailsDefault; }
   });
+  const setStartupDetails = (valOrFn) => {
+    setStartupDetailsRaw(prev => {
+      const next = typeof valOrFn === 'function' ? valOrFn(prev) : valOrFn;
+      try { sessionStorage.setItem('sx_startup_details', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
-  // 5. Analysis Scores (Step 3) — persisted to sessionStorage
-  const [analysisScores, setAnalysisScores] = useState(() => {
-    try { const s = sessionStorage.getItem('analysis_scores'); return s ? JSON.parse(s) : null; } catch { return null; }
+  // 5. Analysis Scores — persisted in sessionStorage (survives reload, cleared on tab close)
+  const [analysisScores, setAnalysisScoresRaw] = useState(() => {
+    try { const s = sessionStorage.getItem('sx_scores'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
-  const [fullAnalysisData, setFullAnalysisData] = useState(() => {
-    try { const s = sessionStorage.getItem('full_analysis_data'); return s ? JSON.parse(s) : null; } catch { return null; }
+  const [fullAnalysisData, setFullAnalysisDataRaw] = useState(() => {
+    try { const s = sessionStorage.getItem('sx_analysis'); return s ? JSON.parse(s) : null; } catch { return null; }
   });
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // Wrapped setters that also persist to sessionStorage
+  const setAnalysisScores = (val) => {
+    setAnalysisScoresRaw(val);
+    try { if (val) sessionStorage.setItem('sx_scores', JSON.stringify(val)); else sessionStorage.removeItem('sx_scores'); } catch {}
+  };
+  const setFullAnalysisData = (val) => {
+    setFullAnalysisDataRaw(val);
+    try { if (val) sessionStorage.setItem('sx_analysis', JSON.stringify(val)); else sessionStorage.removeItem('sx_analysis'); } catch {}
+  };
 
   // 6. History — loaded from DB after login, never from localStorage
   const [analysisHistory, setAnalysisHistory] = useState([]);
@@ -133,30 +153,31 @@ export const StartupProvider = ({ children }) => {
     }
   }, []);
 
-  // When user changes — only reset when it's a genuine user switch (not initial load)
+  // Track previous email to detect genuine account switches (not initial mount)
   const prevEmailRef = useRef(null);
   useEffect(() => {
-    const prevEmail = prevEmailRef.current;
+    const prev = prevEmailRef.current;
     prevEmailRef.current = user?.email || null;
-
-    // Skip on initial mount (prevEmail is null) — sessionStorage already has the data
-    if (prevEmail === null) return;
-
-    if (user?.email) {
-      const savedDraft = localStorage.getItem(`startup_draft_${user.email}`);
-      setResumeState(!!savedDraft);
-      // Only clear roadmap/history if the user actually switched accounts
-      if (prevEmail && prevEmail !== user.email) {
-        setRoadmapNodes([]);
-        setRoadmapData(null);
-        setAnalysisHistory([]);
-        try { sessionStorage.clear(); } catch {}
+    // On initial mount, prev is null — don't wipe sessionStorage data
+    if (prev === null) {
+      if (user?.email) {
+        const savedDraft = localStorage.getItem(`startup_draft_${user.email}`);
+        setResumeState(!!savedDraft);
       }
-    } else {
+      return;
+    }
+    // Genuine account switch — clear everything
+    if (user?.email !== prev) {
+      setRoadmapNodesRaw([]);
+      setRoadmapDataRaw(null);
       setAnalysisHistory([]);
-      setRoadmapNodes([]);
-      setResumeState(false);
-      try { sessionStorage.clear(); } catch {}
+      try { sessionStorage.removeItem('sx_roadmap_nodes'); sessionStorage.removeItem('sx_roadmap_data'); sessionStorage.removeItem('sx_scores'); sessionStorage.removeItem('sx_analysis'); sessionStorage.removeItem('sx_startup_details'); } catch {}
+      if (user?.email) {
+        const savedDraft = localStorage.getItem(`startup_draft_${user.email}`);
+        setResumeState(!!savedDraft);
+      } else {
+        setResumeState(false);
+      }
     }
   }, [user?.email]);
 
@@ -208,10 +229,10 @@ export const StartupProvider = ({ children }) => {
     if (user?.email) {
       localStorage.removeItem(`startup_draft_${user.email}`);
     }
-    setRoadmapNodes([]);
-    setRoadmapData(null);
-    setAnalysisScores(null);
-    setFullAnalysisData(null);
+    setRoadmapNodesRaw([]);
+    setRoadmapDataRaw(null);
+    setAnalysisScoresRaw(null);
+    setFullAnalysisDataRaw(null);
     setAnalysisHistory([]);
     try {
       sessionStorage.removeItem('analysis_scores');
@@ -220,6 +241,7 @@ export const StartupProvider = ({ children }) => {
       sessionStorage.removeItem('roadmap_data');
     } catch {}
     setResumeState(false);
+    try { sessionStorage.removeItem('sx_roadmap_nodes'); sessionStorage.removeItem('sx_roadmap_data'); sessionStorage.removeItem('sx_scores'); sessionStorage.removeItem('sx_analysis'); sessionStorage.removeItem('sx_startup_details'); } catch {}
     setOnboardingRole({ fullName: '', age: '', gender: '', city: '', country: '', profession: '', experience: '', founderCount: '', founderSkillset: [] });
     setStartupDetails({ startupName: '', startupDomain: '', problemStatement: '', startupDescription: '', targetAudience: '', geographicMarket: '', existingCompetitors: '', revenueModel: '', estimatedPricing: '', availableFunding: '', monthlyBurnCapacity: '', platformType: [], techComplexity: '', mvpTimeline: '', scalabilityGoal: '', acquisitionStrategy: '', startupStage: '' });
     setUser({ fullName: '', email: '', role: 'Founder', avatarUrl: '' });
@@ -433,9 +455,9 @@ export const StartupProvider = ({ children }) => {
   };
 
   const updateRoadmapNode = (id, updatedFields) => {
-    setRoadmapNodes(prev => {
+    setRoadmapNodesRaw(prev => {
       const updated = prev.map(node => node.id === id ? { ...node, ...updatedFields } : node);
-      try { sessionStorage.setItem('roadmap_nodes', JSON.stringify(updated)); } catch {}
+      try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(updated)); } catch {}
       return updated;
     });
 
@@ -622,19 +644,6 @@ export const StartupProvider = ({ children }) => {
 
       const result = await submitValidation(payload);
 
-      // Save session_id to Supabase profiles so it persists across sessions
-      if (result?.session_id && userId) {
-        try {
-          const { supabase } = await import('../services/supabase');
-          await supabase.from('profiles').upsert({
-            id: userId,
-            last_session_id:   result.session_id,
-            last_startup_name: details.startupName || '',
-          }, { onConflict: 'id' });
-        } catch (e) {
-          console.warn('[Profile] session_id save failed:', e.message);
-        }
-      }
 
       const ap = result?.analysis_phase_state || {};
       const scores = {
@@ -694,12 +703,9 @@ export const StartupProvider = ({ children }) => {
 
       const result = await submitRoadmap(sessionId, team);
       const nodes = _buildRoadmapNodes(result);
-      setRoadmapData(result);
-      setRoadmapNodes(nodes);
-      try {
-        sessionStorage.setItem('roadmap_data', JSON.stringify(result));
-        sessionStorage.setItem('roadmap_nodes', JSON.stringify(nodes));
-      } catch {}
+      setRoadmapNodesRaw(nodes);
+      setRoadmapDataRaw(result);
+      try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(nodes)); sessionStorage.setItem('sx_roadmap_data', JSON.stringify(result)); } catch {}
       showToast('Roadmap generated successfully!', 'success');
       return result;
     } catch (err) {
