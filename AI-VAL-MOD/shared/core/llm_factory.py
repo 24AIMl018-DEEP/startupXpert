@@ -121,13 +121,13 @@ def _is_quota_exhausted(err: Exception) -> bool:
 
 def call_llm_with_fallback(prompt: str, tier: int, temperature: float = None) -> str:
     temp = temperature if temperature is not None else Config.DEFAULT_TEMPERATURE
-    # Always try requested tier first, then fall back upward (2→3) if tier=1 fails,
-    # or downward (3→2→1) if a higher tier fails. Ollama (tier 1) is last resort.
+    # Always try requested tier first, then the other cloud tier, and finally Ollama (local)
     if tier == 1:
-        # On production Ollama won't be available — go up to Groq, then NVIDIA
-        tiers_to_try = list(dict.fromkeys([1, 2, 3]))
+        tiers_to_try = [1, 2, 3]  # Ollama -> Groq -> NVIDIA
+    elif tier == 2:
+        tiers_to_try = [2, 3, 1]  # Groq -> NVIDIA -> Ollama
     else:
-        tiers_to_try = list(dict.fromkeys([tier] + list(range(tier - 1, 0, -1))))
+        tiers_to_try = [3, 2, 1]  # NVIDIA -> Groq -> Ollama
 
     last_err = None
     for current_tier in tiers_to_try:
