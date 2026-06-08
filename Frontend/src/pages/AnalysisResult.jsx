@@ -128,7 +128,7 @@ const AnalysisResult = () => {
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [activeTab, setActiveTab]         = useState('overview');
 
-  const handleSave = () => { saveAnalysis(analysisScores); setTimeout(() => navigate('/dashboard'), 1200); };
+  const handleSave = () => { saveAnalysis(analysisScores); setTimeout(() => navigate('/roadmap'), 1200); };
   const handleExport = () => showToast('PDF export coming in V2.0!', 'info');
 
   if (!analysisScores) {
