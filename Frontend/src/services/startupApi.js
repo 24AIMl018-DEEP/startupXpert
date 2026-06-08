@@ -292,6 +292,157 @@ export async function patchBranch(branchId, fields) {
   }
 }
 
+// ── Post-login DB restoration ─────────────────────────────────────────────────
+
+/**
+ * Restore full analysis data from Supabase after a fresh login.
+ * Reconstructs fullAnalysisData, analysisScores, and startupDetails
+ * from the DB tables so tabs (Market/Competition/Risks/Intelligence/Pitch)
+ * show correct data even without sessionStorage.
+ */
+export async function fetchLatestAnalysis(userId) {
+  if (!userId) return null;
+  try {
+    const { supabase } = await import('./supabase');
+
+    // 1. Latest startup_input for this user
+    const { data: session } = await supabase
+      .from('startup_input')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!session) return null;
+    const sessionId = session.id;
+
+    // 2. pipeline_output — confirm validation completed
+    const { data: po } = await supabase
+      .from('pipeline_output')
+      .select('aggregate_validation_score, status')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!po) return null;
+
+    // 3. analysis_phase
+    const { data: ap } = await supabase
+      .from('analysis_phase')
+      .select('id, aggregate_score')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!ap) return null;
+
+    // 4. Per-agent results
+    const { data: agentRows } = await supabase
+      .from('analysis_agent_results')
+      .select(
+        'agent, score, verdict, summary,' +
+        'strengths, weaknesses, recommendations, risks,' +
+        'tam_signal, demand_signals, timing_assessment,' +
+        'key_competitors, competitive_gaps, differentiation_strength,' +
+        'overall_risk_level, usp_statement, innovation_factors,' +
+        'defensibility, differentiation_vs_competitors'
+      )
+      .eq('analysis_phase_id', ap.id);
+
+    if (!agentRows || agentRows.length === 0) return null;
+
+    const byAgent = {};
+    agentRows.forEach(r => { byAgent[r.agent] = r; });
+
+    const fe  = byAgent['feasibility_analysis'] || {};
+    const mo  = byAgent['market_opportunity']   || {};
+    const co  = byAgent['competition_analysis'] || {};
+    const ri  = byAgent['risk_analysis']        || {};
+    const inn = byAgent['innovation_usp']       || {};
+
+    // 5. Pitch phase
+    const { data: pitchData } = await supabase
+      .from('pitch_phase')
+      .select('startup_name, pitch_text, pitch_length, indexed_chunks')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    // Reconstruct fullAnalysisData matching backend PipelineState structure
+    const fullAnalysisData = {
+      session_id:                 sessionId,
+      status:                     po.status || 'success',
+      startup_name:               session.startup_name,
+      aggregate_validation_score: po.aggregate_validation_score,
+      analysis_phase_state: {
+        total_agents:      agentRows.length,
+        successful_agents: agentRows.filter(r => r.score != null).length,
+        failed_agents:     agentRows.filter(r => r.score == null).length,
+        aggregate_score:   ap.aggregate_score || po.aggregate_validation_score || 0,
+        feasibility:        fe,
+        market_opportunity: mo,
+        competition:        co,
+        risk:               ri,
+        innovation_usp:     inn,
+      },
+      query_phase_state: {},
+      pitch_state:        pitchData || {},
+    };
+
+    // Reconstruct analysisScores (mirrors _mapAgent in StartupContext)
+    const mapAgent = (agent) => {
+      if (!agent || agent.score == null) return { score: 0, status: 'Low', details: 'Data unavailable.' };
+      const score  = Math.round(agent.score || 0);
+      const status = score >= 70 ? 'High' : score >= 45 ? 'Medium' : 'Low';
+      return { score, status, details: agent.summary || agent.verdict || '' };
+    };
+
+    const analysisScores = {
+      feasibility:        mapAgent(fe),
+      marketDemand:       mapAgent(mo),
+      competitorPresence: mapAgent(co),
+      riskLevel:          mapAgent(ri),
+      innovationLevel:    mapAgent(inn),
+      targetAudienceFit:  mapAgent(fe),
+      problemSolutionFit: mapAgent(fe),
+      revenuePotential:   mapAgent(mo),
+      scalability:        mapAgent(fe),
+    };
+
+    // Reconstruct startupDetails (frontend camelCase ↔ DB snake_case)
+    const startupDetails = {
+      startupName:         session.startup_name                      || '',
+      startupDomain:       session.startup_domain                    || '',
+      problemStatement:    session.problem_statement                 || '',
+      startupDescription:  session.startup_description               || '',
+      targetAudience:      session.target_audience                   || '',
+      geographicMarket:    session.geographic_market                 || '',
+      existingCompetitors: session.existing_competitors              || '',
+      revenueModel:        session.revenue_model                     || '',
+      estimatedPricing:    session.estimated_pricing                 || '',
+      availableFunding:    session.available_funding                 || '',
+      monthlyBurnCapacity: session.monthly_burn_capacity             || '',
+      platformType:        session.platform_type                     || [],
+      techComplexity:      session.technology_complexity             || '',
+      mvpTimeline:         session.mvp_timeline                      || '',
+      scalabilityGoal:     session.scalability_goal                  || '',
+      acquisitionStrategy: session.customer_acquisition_strategy     || '',
+      startupStage:        session.current_startup_stage             || '',
+    };
+
+    console.log(`[DB Restore] Restored analysis for session=${sessionId} score=${po.aggregate_validation_score}`);
+    return { fullAnalysisData, analysisScores, startupDetails, sessionId };
+  } catch (err) {
+    console.error('[API] fetchLatestAnalysis failed:', err);
+    return null;
+  }
+}
+
+
 // Sync a task edit to DB
 export async function patchTask(taskId, fields) {
   const headers = await getAuthHeaders();

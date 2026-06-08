@@ -134,16 +134,27 @@ async def run_roadmap_pipeline(
         for t in final_state["synced_tasks"]
     ]
 
+    # ── Safe coercions ── LLM can return tech_required as "true"/"false" string
+    def _bool(val) -> bool:
+        if isinstance(val, bool): return val
+        if isinstance(val, int):  return bool(val)
+        if isinstance(val, str):  return val.strip().lower() in ("true", "1", "yes")
+        return False
+
+    def _strlist(val) -> list:
+        if isinstance(val, list): return [str(v) for v in val if v is not None]
+        return []
+
     pipeline_state = RoadmapPipelineState(
         session_id=      session_id,
         status=          "success",
         startup_name=    startup_data.startup_name,
         profiler_output= ProfilerOutput(
-            business_type=        profiler_output["business_type"],
-            tech_required=        profiler_output["tech_required"],
-            prioritized_branches= approved_branches,
-            banned_branches=      profiler_output.get("banned_branches", []),
-            reasoning=            profiler_output.get("reasoning", ""),
+            business_type=        str(profiler_output.get("business_type") or "Unknown"),
+            tech_required=        _bool(profiler_output.get("tech_required")),
+            prioritized_branches= _strlist(approved_branches),
+            banned_branches=      _strlist(profiler_output.get("banned_branches")),
+            reasoning=            str(profiler_output.get("reasoning") or ""),
         ),
         branch_roadmaps= branch_roadmaps,
         synced_tasks=    synced_tasks,

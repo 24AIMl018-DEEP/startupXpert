@@ -49,6 +49,31 @@ export const StartupProvider = ({ children }) => {
     }
   }, [isLoggedIn]);
 
+  // ── Post-login DB restoration ──────────────────────────────────────────────
+  // If sessionStorage was cleared (logout / new tab), fetch the latest
+  // analysis from Supabase so Market / Competition / Risks / Intelligence /
+  // Pitch tabs all show real data instead of "0 N/A".
+  useEffect(() => {
+    const uid = user?.userId;
+    if (!isLoggedIn || !uid) return;
+    if (analysisScores && fullAnalysisData) return; // already populated
+
+    import('../services/startupApi').then(({ fetchLatestAnalysis }) => {
+      fetchLatestAnalysis(uid)
+        .then(data => {
+          if (!data) return;
+          if (!analysisScores)    setAnalysisScores(data.analysisScores);
+          if (!fullAnalysisData)  setFullAnalysisData(data.fullAnalysisData);
+          // Restore startupDetails so the hero header shows startup name / domain
+          setStartupDetails(prev => {
+            if (prev.startupName) return prev; // already set this session
+            return data.startupDetails;
+          });
+        })
+        .catch(err => console.warn('[Context] DB restore failed:', err.message));
+    });
+  }, [isLoggedIn, user?.userId]); // eslint-disable-line
+
 
 
   // 2. Settings State (persisted under startup_settings)
@@ -658,12 +683,8 @@ export const StartupProvider = ({ children }) => {
         scalability:        _mapAgent(ap?.feasibility),
       };
 
-      setAnalysisScores(scores);
-      setFullAnalysisData(result);
-      try {
-        sessionStorage.setItem('analysis_scores', JSON.stringify(scores));
-        sessionStorage.setItem('full_analysis_data', JSON.stringify(result));
-      } catch {}
+      setAnalysisScores(scores);     // persists to sx_scores via setter
+      setFullAnalysisData(result);    // persists to sx_analysis via setter
       return scores;
     } catch (err) {
       // Re-throw so AnalysisLoader can catch and show error UI
@@ -682,7 +703,6 @@ export const StartupProvider = ({ children }) => {
       let sessionId = null;
 
       // Get latest validated session from VALIDATION service (always up)
-      // Do NOT use Roadmap service here — it may be down
       if (user?.userId) {
         try {
           const { checkUserHasValidation } = await import('../services/startupApi');
@@ -701,7 +721,56 @@ export const StartupProvider = ({ children }) => {
         return null;
       }
 
-      const result = await submitRoadmap(sessionId, team);
+      let result = null;
+      try {
+        result = await submitRoadmap(sessionId, team);
+      } catch (apiErr) {
+        console.warn('[Roadmap] API generation failed:', apiErr.message);
+
+        // ── DB Fallback: load previously generated roadmap from Supabase ──
+        try {
+          const { fetchSessionRoadmap } = await import('../services/startupApi');
+          const dbRoadmap = await fetchSessionRoadmap(sessionId);
+          if (dbRoadmap?.branches?.length > 0) {
+            console.log('[Roadmap] API failed — loaded existing roadmap from DB');
+            // Convert DB format → node format
+            const fallbackNodes = [{
+              id: 'root', parentId: null, branchDbId: null,
+              title: dbRoadmap.profiler?.startup_name || startupDetails.startupName || 'Startup',
+              description: dbRoadmap.profiler?.business_type || '',
+              status: 'In Progress', priority: 'High', isExpanded: true, tasks: [], notes: [],
+              recommendations: dbRoadmap.profiler?.reasoning || '',
+            }];
+            (dbRoadmap.branches || []).forEach(b => {
+              fallbackNodes.push({
+                id: `branch-${b.branch}`, parentId: 'root', branchDbId: b.id || null,
+                title: b.branch.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+                description: b.summary || '', status: 'In Progress', priority: 'Medium',
+                isExpanded: true, recommendations: b.summary || '',
+                tasks: (b.tasks || []).map((t, i) => ({
+                  id: t.task_id || `t-${i}`, dbTaskId: t.id || null,
+                  text: `[${t.timeline || ''}] ${t.title}`.trim(),
+                  completed: false, priority: t.priority || 'Medium',
+                  assignedTo: t.assigned_to || '', complexity: t.complexity || '',
+                  costImpact: t.cost_impact || '', description: t.description || '',
+                  timeline: t.timeline || '',
+                })),
+                notes: [],
+              });
+            });
+            setRoadmapNodesRaw(fallbackNodes);
+            try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(fallbackNodes)); } catch {}
+            showToast('Loaded your previously generated roadmap.', 'info');
+            return dbRoadmap;
+          }
+        } catch (dbErr) {
+          console.warn('[Roadmap] DB fallback also failed:', dbErr.message);
+        }
+
+        // Both API and DB failed — show the original API error
+        throw apiErr;
+      }
+
       const nodes = _buildRoadmapNodes(result);
       setRoadmapNodesRaw(nodes);
       setRoadmapDataRaw(result);
@@ -709,7 +778,7 @@ export const StartupProvider = ({ children }) => {
       showToast('Roadmap generated successfully!', 'success');
       return result;
     } catch (err) {
-      showToast(err.message || 'Roadmap generation failed.', 'error');
+      showToast(`Roadmap generation failed: ${err.message || 'Unknown error'}`, 'error');
       return null;
     } finally {
       setIsGeneratingRoadmap(false);
