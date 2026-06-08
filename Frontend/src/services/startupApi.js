@@ -143,9 +143,62 @@ export async function fetchSessionRoadmap(sessionId) {
   const headers = await getAuthHeaders();
   try {
     const res = await fetch(`${ROADMAP_URL}/api/v1/roadmap/${sessionId}`, { headers });
-    if (!res.ok) return null;
-    return res.json();
+    if (res.ok) return await res.json();
   } catch {
+    console.warn('[Roadmap] API unreachable, falling back to direct DB query.');
+  }
+
+  // Fallback: Query Supabase directly
+  try {
+    const { supabase } = await import('./supabase');
+    
+    // 1. Get profiler
+    const { data: profilerData } = await supabase
+      .from('roadmap_profiler')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+      
+    // 2. Get branches
+    const { data: branchesData } = await supabase
+      .from('roadmap_branches')
+      .select('*')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true });
+      
+    if (!branchesData || branchesData.length === 0) return null;
+
+    // 3. Get tasks for each branch
+    const branchIds = branchesData.map(b => b.id);
+    const { data: tasksData } = await supabase
+      .from('roadmap_tasks')
+      .select('*')
+      .in('branch_id', branchIds);
+      
+    const branchesWithTasks = branchesData.map(branch => ({
+      ...branch,
+      tasks: (tasksData || []).filter(t => t.branch_id === branch.id)
+    }));
+
+    // 4. Get pipeline output
+    const { data: pipelineData } = await supabase
+      .from('pipeline_output')
+      .select('aggregate_validation_score, status')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    return {
+      session_id: sessionId,
+      profiler: profilerData || {},
+      branches: branchesWithTasks,
+      pipeline_output: pipelineData || {}
+    };
+  } catch (dbErr) {
+    console.error('[Roadmap] DB Fallback failed:', dbErr);
     return null;
   }
 }
@@ -217,29 +270,49 @@ export async function fetchValidatedSessions(userId) {
 // Sync a branch edit to DB
 export async function patchBranch(branchId, fields) {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${ROADMAP_URL}/api/v1/branches/${branchId}`, {
-    method:  'PATCH',
-    headers,
-    body:    JSON.stringify(fields),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Branch update error: ${res.status}`);
+  try {
+    const res = await fetch(`${ROADMAP_URL}/api/v1/branches/${branchId}`, {
+      method:  'PATCH',
+      headers,
+      body:    JSON.stringify(fields),
+    });
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn('[Roadmap] API unreachable for patchBranch, falling back to direct DB query.');
   }
-  return res.json();
+
+  try {
+    const { supabase } = await import('./supabase');
+    const { data, error } = await supabase.from('roadmap_branches').update(fields).eq('id', branchId).select().single();
+    if (error) throw error;
+    return { status: 'updated', branch: data };
+  } catch (dbErr) {
+    console.error('[Roadmap] DB Fallback patchBranch failed:', dbErr);
+    throw dbErr;
+  }
 }
 
 // Sync a task edit to DB
 export async function patchTask(taskId, fields) {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${ROADMAP_URL}/api/v1/tasks/${taskId}`, {
-    method:  'PATCH',
-    headers,
-    body:    JSON.stringify(fields),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Task update error: ${res.status}`);
+  try {
+    const res = await fetch(`${ROADMAP_URL}/api/v1/tasks/${taskId}`, {
+      method:  'PATCH',
+      headers,
+      body:    JSON.stringify(fields),
+    });
+    if (res.ok) return await res.json();
+  } catch (err) {
+    console.warn('[Roadmap] API unreachable for patchTask, falling back to direct DB query.');
   }
-  return res.json();
+
+  try {
+    const { supabase } = await import('./supabase');
+    const { data, error } = await supabase.from('roadmap_tasks').update(fields).eq('id', taskId).select().single();
+    if (error) throw error;
+    return { status: 'updated', task: data };
+  } catch (dbErr) {
+    console.error('[Roadmap] DB Fallback patchTask failed:', dbErr);
+    throw dbErr;
+  }
 }
