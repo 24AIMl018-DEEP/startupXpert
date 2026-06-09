@@ -319,14 +319,18 @@ export const StartupProvider = ({ children }) => {
     localStorage.setItem('startupxpert_user', JSON.stringify(userInfo));
   };
 
-  // Sync Active Theme Class to DOM
+  // Sync Active Theme Class to DOM (dark/light + theme variant)
   useEffect(() => {
     const activeTheme = settings.theme || 'Dark Futurism';
+    const isLight     = settings.themeMode === 'Light';
 
-    // Remove other theme classes
-    document.body.classList.remove('theme-dark-futurism', 'theme-midnight-blue', 'theme-neo-emerald');
+    // Remove all theme/mode classes
+    document.body.classList.remove(
+      'theme-dark-futurism', 'theme-midnight-blue', 'theme-neo-emerald', 'light-mode'
+    );
+    document.documentElement.removeAttribute('data-theme');
 
-    // Add active theme class
+    // Add theme class
     if (activeTheme === 'Midnight Blue') {
       document.body.classList.add('theme-midnight-blue');
     } else if (activeTheme === 'Neo Emerald') {
@@ -334,7 +338,13 @@ export const StartupProvider = ({ children }) => {
     } else {
       document.body.classList.add('theme-dark-futurism');
     }
-  }, [settings.theme]);
+
+    // Add light mode class
+    if (isLight) {
+      document.body.classList.add('light-mode');
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+  }, [settings.theme, settings.themeMode]);
 
   const setNewUserStatus = (status) => {
     setUser(prev => {
