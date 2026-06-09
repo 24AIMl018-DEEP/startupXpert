@@ -97,6 +97,11 @@ export const StartupProvider = ({ children }) => {
   });
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
 
+  const setRoadmapNodesFromDB = (nodes) => {
+    setRoadmapNodesRaw(nodes);
+    try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(nodes)); } catch {}
+  };
+
   // Wrapped roadmap setters
   const setRoadmapNodes = (val) => {
     setRoadmapNodesRaw(prev => {
@@ -946,7 +951,8 @@ export const StartupProvider = ({ children }) => {
         deleteRoadmapNode,
         manageSubTask,
         manageNote,
-        generateRoadmap
+        generateRoadmap,
+        setRoadmapNodesFromDB,
       }}
     >
       {children}

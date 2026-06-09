@@ -133,7 +133,7 @@ const TeamModal = ({ onConfirm, onCancel, isGenerating }) => {
 /* ─── Main Component ──────────────────────────────── */
 const Roadmap = () => {
   const navigate = useNavigate();
-  const { user, startupDetails, roadmapNodes, isGeneratingRoadmap, generateRoadmap, updateRoadmapNode, addRoadmapNode, deleteRoadmapNode, manageSubTask } = useStartup();
+  const { user, startupDetails, roadmapNodes, isGeneratingRoadmap, generateRoadmap, updateRoadmapNode, addRoadmapNode, deleteRoadmapNode, manageSubTask, setRoadmapNodesFromDB } = useStartup();
   const { showToast } = useToast();
 
   const [selectedId,    setSelectedId]    = useState(null);
@@ -142,8 +142,7 @@ const Roadmap = () => {
   const [newTask,       setNewTask]       = useState('');
 
   /* Restore from DB if empty */
-  const [restoredNodes, setRestoredNodes] = useState([]);
-  const displayNodes = roadmapNodes.length > 0 ? roadmapNodes : restoredNodes;
+  const displayNodes = roadmapNodes;
   const activeNode = useMemo(() => displayNodes.find(n => n.id === selectedId) || null, [displayNodes, selectedId]);
 
   useEffect(() => {
@@ -176,8 +175,7 @@ const Roadmap = () => {
               notes: [],
             });
           });
-          setRestoredNodes(nodes);
-          try { sessionStorage.setItem('roadmap_nodes', JSON.stringify(nodes)); } catch {}
+          setRoadmapNodesFromDB(nodes);
         }).catch(() => {});
       }).catch(() => {});
     });

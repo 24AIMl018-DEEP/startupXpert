@@ -91,10 +91,9 @@ def get_roadmap_profiler(session_id: str) -> Optional[Dict]:
 
 
 def get_roadmap_branches(session_id: str) -> List[Dict]:
-    """Get all branches for a session."""
+    """Get all branches for a session, ordered oldest-first."""
     return _select("roadmap_branches", lambda t:
-        t.select("*").eq("session_id", session_id)
-         .order("created_at", ascending=True)
+        t.select("*").eq("session_id", session_id).order("created_at")
     )
 
 
