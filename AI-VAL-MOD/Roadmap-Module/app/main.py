@@ -156,7 +156,7 @@ def debug_session(session_id: str):
     }
 
 
-@app.post("/api/v1/roadmap", response_model=RoadmapPipelineState)
+@app.post("/api/v1/roadmap")
 async def generate_roadmap(payload: RoadmapRequest):
     try:
         return await run_roadmap_pipeline(
