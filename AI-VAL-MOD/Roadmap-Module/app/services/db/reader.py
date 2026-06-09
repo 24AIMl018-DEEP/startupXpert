@@ -92,9 +92,12 @@ def get_roadmap_profiler(session_id: str) -> Optional[Dict]:
 
 def get_roadmap_branches(session_id: str) -> List[Dict]:
     """Get all branches for a session, ordered oldest-first."""
-    return _select("roadmap_branches", lambda t:
-        t.select("*").eq("session_id", session_id).order("created_at")
-    )
+    try:
+        res = _db().table("roadmap_branches").select("*").eq("session_id", session_id).execute()
+        return res.data or []
+    except Exception as e:
+        logger.error("[DBReader:roadmap_branches] %s", e)
+        return []
 
 
 def get_roadmap_tasks(branch_id: str) -> List[Dict]:
