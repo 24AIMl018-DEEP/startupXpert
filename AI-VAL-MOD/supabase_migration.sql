@@ -87,3 +87,12 @@ DROP TABLE IF EXISTS public.documents CASCADE;
 DROP TABLE IF EXISTS public.roadmaps CASCADE;
 DROP TABLE IF EXISTS public.validations CASCADE;
 DROP TABLE IF EXISTS public.startup_ideas CASCADE;
+
+-- 7. Add phase/milestone columns to roadmap_tasks (run if columns are missing)
+ALTER TABLE public.roadmap_tasks
+    ADD COLUMN IF NOT EXISTS phase       TEXT,
+    ADD COLUMN IF NOT EXISTS phase_goal  TEXT,
+    ADD COLUMN IF NOT EXISTS milestone   BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_roadmap_tasks_milestone ON public.roadmap_tasks(milestone);
+CREATE INDEX IF NOT EXISTS idx_roadmap_tasks_phase     ON public.roadmap_tasks(phase);

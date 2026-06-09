@@ -93,9 +93,6 @@ def write_tasks(branch_id: str, tasks: List[Dict]) -> List[Dict]:
             "description":     task.get("description"),
             "timeline":        task.get("timeline"),
             "priority":        task.get("priority"),
-            "phase":           task.get("phase"),        # milestone group name
-            "phase_goal":      task.get("phase_goal"),   # phase completion goal
-            "milestone":       task.get("milestone", False),
             "assigned_to":     task.get("assigned_to"),
             "assignee_role":   task.get("assignee_role"),
             "estimated_hours": task.get("estimated_hours"),
