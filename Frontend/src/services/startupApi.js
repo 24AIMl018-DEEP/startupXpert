@@ -282,6 +282,45 @@ export async function fetchValidatedSessions(userId) {
   }
 }
 
+// Fetch ALL roadmaps for a user (for history view) — pure Supabase, no API
+export async function fetchAllUserRoadmaps(userId) {
+  if (!userId) return [];
+  try {
+    // 1. All startup sessions for this user
+    const { data: sessions } = await supabase
+      .from('startup_input')
+      .select('id, startup_name, startup_domain, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (!sessions?.length) return [];
+
+    // 2. Which ones have a roadmap profiler (= roadmap was generated)
+    const sessionIds = sessions.map(s => s.id);
+    const { data: profilers } = await supabase
+      .from('roadmap_profiler')
+      .select('session_id, startup_name, business_type, created_at')
+      .in('session_id', sessionIds)
+      .order('created_at', { ascending: false });
+
+    if (!profilers?.length) return [];
+
+    // 3. Return merged list — only sessions that have a roadmap
+    return profilers.map(p => {
+      const session = sessions.find(s => s.id === p.session_id);
+      return {
+        sessionId:   p.session_id,
+        startupName: p.startup_name || session?.startup_name || 'Unnamed',
+        domain:      session?.startup_domain || '',
+        createdAt:   p.created_at,
+      };
+    });
+  } catch (err) {
+    console.error('[fetchAllUserRoadmaps] failed:', err);
+    return [];
+  }
+}
+
 // Sync a branch edit to DB
 export async function patchBranch(branchId, fields) {
   const headers = await getAuthHeaders();

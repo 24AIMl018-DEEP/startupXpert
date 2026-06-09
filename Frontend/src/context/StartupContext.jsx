@@ -88,32 +88,65 @@ export const StartupProvider = ({ children }) => {
     };
   });
 
-  // Roadmap State — persisted to sessionStorage so refresh keeps them
-  const [roadmapNodes, setRoadmapNodesRaw] = useState(() => {
-    try { const s = sessionStorage.getItem('sx_roadmap_nodes'); return s ? JSON.parse(s) : []; } catch { return []; }
-  });
-  const [roadmapData, setRoadmapDataRaw] = useState(() => {
-    try { const s = sessionStorage.getItem('sx_roadmap_data'); return s ? JSON.parse(s) : null; } catch { return null; }
-  });
+  // Roadmap State — DB is the only source of truth, zero localStorage/sessionStorage
+  const [roadmapNodes,       setRoadmapNodesRaw] = useState([]);
+  const [roadmapData,        setRoadmapDataRaw]  = useState(null);
+  const [allRoadmaps,        setAllRoadmaps]     = useState([]); // history list [{sessionId,startupName,domain,createdAt}]
   const [isGeneratingRoadmap, setIsGeneratingRoadmap] = useState(false);
 
-  const setRoadmapNodesFromDB = (nodes) => {
-    setRoadmapNodesRaw(nodes);
-    try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(nodes)); } catch {}
-  };
+  // Simple wrappers (no storage side-effects)
+  const setRoadmapNodesFromDB = (nodes) => setRoadmapNodesRaw(nodes);
+  const setRoadmapNodes = (val) =>
+    setRoadmapNodesRaw(prev => typeof val === 'function' ? val(prev) : val);
 
-  // Wrapped roadmap setters
-  const setRoadmapNodes = (val) => {
-    setRoadmapNodesRaw(prev => {
-      const next = typeof val === 'function' ? val(prev) : val;
-      try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(next)); } catch {}
-      return next;
+  // Auto-load: on login, fetch ALL user roadmaps list + latest roadmap nodes from DB
+  useEffect(() => {
+    const uid = user?.userId;
+    if (!isLoggedIn || !uid) return;
+    import('../services/startupApi').then(({ fetchAllUserRoadmaps, fetchSessionRoadmap }) => {
+      fetchAllUserRoadmaps(uid).then(list => {
+        setAllRoadmaps(list);
+        if (list.length > 0 && roadmapNodes.length === 0) {
+          // Load the latest one automatically
+          fetchSessionRoadmap(list[0].sessionId).then(data => {
+            if (data?.branches?.length > 0) {
+              setRoadmapNodesRaw(_dbDataToNodes(data));
+              setRoadmapDataRaw(data);
+            }
+          }).catch(() => {});
+        }
+      }).catch(() => {});
     });
-  };
-  const setRoadmapData = (val) => {
-    setRoadmapDataRaw(val);
-    try { if (val) sessionStorage.setItem('sx_roadmap_data', JSON.stringify(val)); else sessionStorage.removeItem('sx_roadmap_data'); } catch {}
-  };
+  }, [isLoggedIn, user?.userId]); // eslint-disable-line
+
+  // Helper: convert DB roadmap response → ReactFlow node array
+  function _dbDataToNodes(data) {
+    const nodes = [{
+      id: 'root', parentId: null, branchDbId: null,
+      title: data.profiler?.startup_name || 'Startup',
+      description: data.profiler?.business_type || '',
+      status: 'In Progress', priority: 'High', isExpanded: true, tasks: [], notes: [],
+      recommendations: data.profiler?.reasoning || '',
+    }];
+    (data.branches || []).forEach(b => {
+      nodes.push({
+        id: `branch-${b.branch}`, parentId: 'root', branchDbId: b.id || null,
+        title: b.branch.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        description: b.summary || '', status: 'In Progress', priority: 'Medium',
+        isExpanded: true, recommendations: b.summary || '',
+        tasks: (b.tasks || []).map((t, i) => ({
+          id: t.task_id || `t-${i}`, dbTaskId: t.id || null,
+          text: `[${t.timeline || ''}] ${t.title}`.trim(),
+          completed: false, priority: t.priority || 'Medium',
+          assignedTo: t.assigned_to || '', complexity: t.complexity || '',
+          costImpact: t.cost_impact || '', description: t.description || '',
+          timeline: t.timeline || '',
+        })),
+        notes: [],
+      });
+    });
+    return nodes;
+  }
 
   // 3. Onboarding Role Setup (Step 1)
   const [onboardingRole, setOnboardingRole] = useState({
@@ -485,14 +518,7 @@ export const StartupProvider = ({ children }) => {
   };
 
   const updateRoadmapNode = (id, updatedFields) => {
-    setRoadmapNodesRaw(prev => {
-      const updated = prev.map(node => node.id === id ? { ...node, ...updatedFields } : node);
-      try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(updated)); } catch {}
-      return updated;
-    });
-
-    // Sync branch-level edits to Supabase if node has a DB id (branch-*)
-    // branchDbId is stored on the node when roadmap is built from backend
+    setRoadmapNodesRaw(prev => prev.map(node => node.id === id ? { ...node, ...updatedFields } : node));
     const node = roadmapNodes.find(n => n.id === id);
     if (!node) return;
 
@@ -702,25 +728,16 @@ export const StartupProvider = ({ children }) => {
   // Generate Roadmap from backend — always uses latest validated session from DB
   const generateRoadmap = async (team = []) => {
     if (!user?.email) return null;
-
     setIsGeneratingRoadmap(true);
     try {
       let sessionId = null;
-
-      // Get latest validated session from VALIDATION service (always up)
       if (user?.userId) {
         try {
           const { checkUserHasValidation } = await import('../services/startupApi');
           const { hasValidation, sessionId: sid } = await checkUserHasValidation(user.userId);
-          if (hasValidation && sid) {
-            sessionId = sid;
-            console.log(`[Roadmap] Using session from Validation DB: ${sessionId}`);
-          }
-        } catch (e) {
-          console.warn('[Roadmap] Validation DB check failed:', e.message);
-        }
+          if (hasValidation && sid) { sessionId = sid; }
+        } catch (e) { console.warn('[Roadmap] session check failed:', e.message); }
       }
-
       if (!sessionId) {
         showToast('No validated session found. Please validate your idea first.', 'error');
         return null;
@@ -732,22 +749,16 @@ export const StartupProvider = ({ children }) => {
       } catch (apiErr) {
         const isTimeout = apiErr.message === 'ROADMAP_TIMEOUT';
         if (isTimeout) {
-          // Backend is still generating — poll DB every 10s for up to 3 minutes
-          showToast('Generation is taking longer than usual. Polling for result…', 'info');
+          showToast('Generation is taking longer… polling DB for result.', 'info');
           for (let i = 0; i < 18; i++) {
             await new Promise(r => setTimeout(r, 10_000));
             try {
               const { fetchSessionRoadmap } = await import('../services/startupApi');
               const dbRoadmap = await fetchSessionRoadmap(sessionId);
               if (dbRoadmap?.branches?.length > 0) {
-                const fallbackNodes = _buildRoadmapNodes({
-                  branch_roadmaps: dbRoadmap.branches,
-                  profiler_output: dbRoadmap.profiler,
-                  startup_name: dbRoadmap.profiler?.startup_name || startupDetails.startupName,
-                });
-                setRoadmapNodesRaw(fallbackNodes);
+                setRoadmapNodesRaw(_dbDataToNodes(dbRoadmap));
                 setRoadmapDataRaw(dbRoadmap);
-                try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(fallbackNodes)); } catch {}
+                await _refreshAllRoadmaps();
                 showToast('Roadmap generated successfully!', 'success');
                 return dbRoadmap;
               }
@@ -755,57 +766,25 @@ export const StartupProvider = ({ children }) => {
           }
           throw new Error('Roadmap generation timed out. Please try again.');
         }
-
-        console.warn('[Roadmap] API generation failed:', apiErr.message);
-
-        // ── DB Fallback: load previously generated roadmap from Supabase ──
+        // Non-timeout failure — try loading existing roadmap from DB
         try {
           const { fetchSessionRoadmap } = await import('../services/startupApi');
           const dbRoadmap = await fetchSessionRoadmap(sessionId);
           if (dbRoadmap?.branches?.length > 0) {
-            console.log('[Roadmap] API failed — loaded existing roadmap from DB');
-            // Convert DB format → node format
-            const fallbackNodes = [{
-              id: 'root', parentId: null, branchDbId: null,
-              title: dbRoadmap.profiler?.startup_name || startupDetails.startupName || 'Startup',
-              description: dbRoadmap.profiler?.business_type || '',
-              status: 'In Progress', priority: 'High', isExpanded: true, tasks: [], notes: [],
-              recommendations: dbRoadmap.profiler?.reasoning || '',
-            }];
-            (dbRoadmap.branches || []).forEach(b => {
-              fallbackNodes.push({
-                id: `branch-${b.branch}`, parentId: 'root', branchDbId: b.id || null,
-                title: b.branch.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-                description: b.summary || '', status: 'In Progress', priority: 'Medium',
-                isExpanded: true, recommendations: b.summary || '',
-                tasks: (b.tasks || []).map((t, i) => ({
-                  id: t.task_id || `t-${i}`, dbTaskId: t.id || null,
-                  text: `[${t.timeline || ''}] ${t.title}`.trim(),
-                  completed: false, priority: t.priority || 'Medium',
-                  assignedTo: t.assigned_to || '', complexity: t.complexity || '',
-                  costImpact: t.cost_impact || '', description: t.description || '',
-                  timeline: t.timeline || '',
-                })),
-                notes: [],
-              });
-            });
-            setRoadmapNodesRaw(fallbackNodes);
-            try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(fallbackNodes)); } catch {}
+            setRoadmapNodesRaw(_dbDataToNodes(dbRoadmap));
+            setRoadmapDataRaw(dbRoadmap);
+            await _refreshAllRoadmaps();
             showToast('Loaded your previously generated roadmap.', 'info');
             return dbRoadmap;
           }
-        } catch (dbErr) {
-          console.warn('[Roadmap] DB fallback also failed:', dbErr.message);
-        }
-
-        // Both API and DB failed — show the original API error
+        } catch { /* ignore */ }
         throw apiErr;
       }
 
       const nodes = _buildRoadmapNodes(result);
       setRoadmapNodesRaw(nodes);
       setRoadmapDataRaw(result);
-      try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(nodes)); sessionStorage.setItem('sx_roadmap_data', JSON.stringify(result)); } catch {}
+      await _refreshAllRoadmaps();
       showToast('Roadmap generated successfully!', 'success');
       return result;
     } catch (err) {
@@ -815,6 +794,15 @@ export const StartupProvider = ({ children }) => {
       setIsGeneratingRoadmap(false);
     }
   };
+
+  async function _refreshAllRoadmaps() {
+    if (!user?.userId) return;
+    try {
+      const { fetchAllUserRoadmaps } = await import('../services/startupApi');
+      const list = await fetchAllUserRoadmaps(user.userId);
+      setAllRoadmaps(list);
+    } catch { /* ignore */ }
+  }
 
   // Convert backend roadmap pipeline output → ReactFlow node tree format
   function _buildRoadmapNodes(result) {
@@ -919,6 +907,7 @@ export const StartupProvider = ({ children }) => {
         dashboardStats,
         roadmapNodes,
         roadmapData,
+        allRoadmaps,
         isGeneratingRoadmap,
         fullAnalysisData,
 
@@ -953,6 +942,14 @@ export const StartupProvider = ({ children }) => {
         manageNote,
         generateRoadmap,
         setRoadmapNodesFromDB,
+        loadRoadmapBySession: async (sessionId) => {
+          const { fetchSessionRoadmap } = await import('../services/startupApi');
+          const data = await fetchSessionRoadmap(sessionId);
+          if (data?.branches?.length > 0) {
+            setRoadmapNodesRaw(_dbDataToNodes(data));
+            setRoadmapDataRaw(data);
+          }
+        },
       }}
     >
       {children}
