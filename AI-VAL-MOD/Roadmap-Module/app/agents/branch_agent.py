@@ -45,6 +45,24 @@ class BranchAgent(BaseAgent):
 
         result["branch"] = branch
         result["status"] = "success"
+
+        # Flatten phases → tasks list (keeping phase + milestone metadata)
+        phases = result.get("phases", [])
+        if phases:
+            flat_tasks = []
+            for ph in phases:
+                phase_name = ph.get("phase", "")
+                phase_goal = ph.get("goal", "")
+                ph_tasks   = ph.get("tasks") or []
+                for t in ph_tasks:
+                    t["phase"]      = phase_name
+                    t["phase_goal"] = phase_goal
+                    t.setdefault("milestone", False)
+                    flat_tasks.append(t)
+            result["tasks"] = flat_tasks
+        elif not result.get("tasks"):
+            result["tasks"] = []
+
         print(f"[{self.name}] DONE — branch='{branch}' tier={tier} tasks={len(result.get('tasks', []))}")
         return result
 

@@ -68,3 +68,13 @@ create index if not exists idx_roadmap_tasks_branch   on roadmap_tasks(branch_id
 create index if not exists idx_roadmap_tasks_task_id  on roadmap_tasks(task_id);
 create index if not exists idx_roadmap_tasks_status   on roadmap_tasks(status);
 create index if not exists idx_roadmap_tasks_assignee on roadmap_tasks(assigned_to);
+
+-- ── Add phase + milestone columns to roadmap_tasks ──────────────────────────
+-- Run this migration in Supabase SQL editor
+alter table roadmap_tasks
+    add column if not exists phase       text,        -- e.g. "Foundation", "Build", "Launch"
+    add column if not exists phase_goal  text,        -- 1-sentence goal for this phase
+    add column if not exists milestone   boolean not null default false;
+
+create index if not exists idx_roadmap_tasks_milestone on roadmap_tasks(milestone);
+create index if not exists idx_roadmap_tasks_phase     on roadmap_tasks(phase);

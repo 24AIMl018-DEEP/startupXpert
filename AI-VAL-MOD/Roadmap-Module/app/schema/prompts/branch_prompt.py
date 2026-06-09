@@ -1,39 +1,47 @@
 BRANCH_PROMPT = """\
 You are a startup execution specialist for the "{branch}" area.
 
-STARTUP CONTEXT:
+STARTUP DATA:
 {startup_json}
 
-BUSINESS PROFILE:
-- Business Type: {business_type}
-- Tech Required: {tech_required}
+BUSINESS PROFILE: {business_type} | Tech: {tech_required}
 
-PRE-ANALYZED OUTLINE (generated from real validation research — expand this, do not ignore it):
+OUTLINE (expand this):
 {branch_outline}
 
-VALIDATION RESEARCH SIGNALS (real data — ground your tasks in these facts):
+VALIDATION SIGNALS:
 {validation_summary}
 
-YOUR TASK:
-Expand the outline into 5-8 concrete, actionable tasks for "{branch}".
+GENERATE a structured execution plan for "{branch}" with 2-3 phases.
+Each phase is a milestone grouping. Each phase has 2-4 specific tasks.
 
-STRICT RULES:
-- Every task must be specific to THIS startup's domain, city/market, stage, and constraints.
-- Ground tasks in the validation signals above — if demand signals say X, tasks should address X.
-- Do NOT write generic startup advice. A Kirana store should NOT get AWS/cloud tasks.
-- Do NOT invent competitors or market data — use only what is provided.
-- Timeline must reflect the startup's current_startup_stage and mvp_timeline.
+RULES:
+- summary: 1 sentence, specific to this startup.
+- phase name: short label e.g. "Foundation", "Build", "Launch", "Scale"
+- phase goal: 1 sentence — what does completing this phase achieve?
+- task title: specific + actionable, no generic words
+- task description: exactly 2 sentences — what to do + measurable outcome
+- timeline: realistic e.g. "Week 1-2", "Month 1", "Month 2-3"
+- priority: High / Medium / Low
+- milestone: true only for the LAST task of each phase (phase completion checkpoint)
 
-OUTPUT FORMAT (strict JSON only):
+OUTPUT (strict JSON only, no text outside):
 {{
   "branch": "{branch}",
-  "summary": "<2-3 sentences specific to this startup's situation for this branch>",
-  "tasks": [
+  "summary": "<1 sentence>",
+  "phases": [
     {{
-      "title": "<specific, actionable title>",
-      "description": "<what to do, why it matters for this startup, how to execute>",
-      "timeline": "<e.g. Week 1-2>",
-      "priority": "<High|Medium|Low>"
+      "phase": "<phase name>",
+      "goal": "<1 sentence>",
+      "tasks": [
+        {{
+          "title": "<actionable title>",
+          "description": "<2 sentences: action + outcome>",
+          "timeline": "<Week X or Month X>",
+          "priority": "<High|Medium|Low>",
+          "milestone": <true|false>
+        }}
+      ]
     }}
   ]
 }}

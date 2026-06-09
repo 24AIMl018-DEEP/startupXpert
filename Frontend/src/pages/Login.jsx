@@ -44,6 +44,13 @@ const Login = () => {
       const name = data.user?.user_metadata?.full_name || form.email.split('@')[0].replace(/^./, c => c.toUpperCase());
       loginUser(form.email, form.password, name, uid);
       if (uid) {
+        // Check if org member → route to member dashboard
+        const { getMyOrganization } = await import('../services/startupApi');
+        const orgData = await getMyOrganization(uid).catch(() => null);
+        if (orgData && orgData.myRole === 'member') {
+          navigate('/member', { replace: true });
+          return;
+        }
         const { hasValidation } = await checkUserHasValidation(uid);
         navigate(hasValidation ? '/dashboard' : '/onboarding/role', { replace: true });
       } else navigate('/onboarding/role');

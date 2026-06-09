@@ -265,11 +265,13 @@ export const StartupProvider = ({ children }) => {
     localStorage.setItem('startupxpert_user', JSON.stringify(activeUser));
   };
 
-  const registerUser = (fullName, email, role, supabaseUserId = null) => {
+  const registerUser = (fullName, email, role, supabaseUserId = null, meta = {}) => {
     const activeUser = {
       fullName, email,
       userId:              supabaseUserId,
       role,
+      userType:            meta.userType || 'solo',   // 'solo' | 'org'
+      orgMode:             meta.orgMode  || null,      // 'create' | 'join'
       avatarUrl:           '',
       isNewUser:           true,
       onboardingCompleted: false,

@@ -521,3 +521,125 @@ export async function patchTask(taskId, fields) {
     throw dbErr;
   }
 }
+
+// ── Organization APIs ──────────────────────────────────────────────────────────
+
+// Create a new organization (called by founder on register)
+export async function createOrganization(name, domain, userId) {
+  const { data, error } = await supabase
+    .from('organizations')
+    .insert({ name, domain: domain || null, created_by: userId })
+    .select()
+    .single();
+  if (error) throw error;
+  // Auto-add founder as org_members with role 'founder'
+  await supabase.from('org_members').insert({
+    org_id: data.id, user_id: userId, role: 'founder',
+  });
+  return data;
+}
+
+// Get org + members for the logged-in user
+export async function getMyOrganization(userId) {
+  if (!userId) return null;
+  const { data: membership } = await supabase
+    .from('org_members')
+    .select('org_id, role, full_name, job_title, skills')
+    .eq('user_id', userId)
+    .order('joined_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!membership) return null;
+
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('id, name, domain, invite_code')
+    .eq('id', membership.org_id)
+    .single();
+
+  const { data: members } = await supabase
+    .from('org_members')
+    .select('id, user_id, role, full_name, job_title, skills, joined_at')
+    .eq('org_id', membership.org_id)
+    .order('joined_at', { ascending: true });
+
+  return { org, myRole: membership.role, members: members || [] };
+}
+
+// Join org via invite code
+export async function joinOrganization(inviteCode, userId, fullName, jobTitle, skills) {
+  const { data: org, error } = await supabase
+    .from('organizations')
+    .select('id')
+    .eq('invite_code', inviteCode)
+    .single();
+  if (error || !org) throw new Error('Invalid invite code.');
+
+  const { error: joinErr } = await supabase.from('org_members').insert({
+    org_id: org.id, user_id: userId, role: 'member',
+    full_name: fullName, job_title: jobTitle,
+    skills: skills || [],
+  });
+  if (joinErr) throw new Error(joinErr.message);
+  return org;
+}
+
+// Get tasks assigned to a specific org member (for member dashboard)
+export async function getMemberTasks(userId) {
+  if (!userId) return [];
+  // Get the org_member id
+  const { data: member } = await supabase
+    .from('org_members')
+    .select('id, org_id')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (!member) return [];
+
+  const { data: tasks } = await supabase
+    .from('roadmap_tasks')
+    .select(`
+      id, task_id, title, description, timeline, priority,
+      dep_status, complexity, cost_impact, completed_at, completion_note,
+      branch_id,
+      roadmap_branches ( branch, session_id,
+        roadmap_profiler ( startup_name )
+      )
+    `)
+    .eq('assigned_member_id', member.id)
+    .order('created_at', { ascending: true });
+
+  return (tasks || []).map(t => ({
+    id: t.id,
+    taskId: t.task_id,
+    title: t.title,
+    description: t.description,
+    timeline: t.timeline,
+    priority: t.priority,
+    status: t.dep_status || 'Pending',
+    complexity: t.complexity,
+    costImpact: t.cost_impact,
+    completedAt: t.completed_at,
+    completionNote: t.completion_note,
+    branch: t.roadmap_branches?.branch?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    startupName: t.roadmap_branches?.roadmap_profiler?.startup_name || 'Startup',
+    sessionId: t.roadmap_branches?.session_id,
+  }));
+}
+
+// Member updates their task status
+export async function updateTaskStatus(taskId, depStatus, completionNote) {
+  const fields = { dep_status: depStatus };
+  if (depStatus === 'Done') fields.completed_at = new Date().toISOString();
+  if (completionNote) fields.completion_note = completionNote;
+  const { error } = await supabase.from('roadmap_tasks').update(fields).eq('id', taskId);
+  if (error) throw error;
+}
+
+// Founder assigns task to an org member
+export async function assignTaskToMember(taskId, memberId, memberName, memberRole) {
+  const { error } = await supabase
+    .from('roadmap_tasks')
+    .update({ assigned_member_id: memberId, assigned_to: memberName, assignee_role: memberRole })
+    .eq('id', taskId);
+  if (error) throw error;
+}

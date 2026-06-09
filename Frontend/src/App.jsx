@@ -13,6 +13,7 @@ import Dashboard from './pages/Dashboard';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 import Roadmap from './pages/Roadmap';
+import MemberDashboard from './pages/MemberDashboard';
 import NotFound from './pages/NotFound';
 
 // New Upgrades Routing Flow
@@ -82,6 +83,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/member" 
+          element={
+            <ProtectedRoute>
+              <MemberDashboard />
             </ProtectedRoute>
           } 
         />
