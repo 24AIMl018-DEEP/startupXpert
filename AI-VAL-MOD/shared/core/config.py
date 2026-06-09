@@ -19,3 +19,7 @@ class Config:
     OLLAMA_BASE_URL           = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     OLLAMA_MODEL              = os.getenv("OLLAMA_MODEL", "llama3.2")
     ENVIRONMENT               = os.getenv("ENVIRONMENT", "development")
+    # Extended free-tier fallback providers
+    DEEPSEEK_API_KEY          = os.getenv("DEEPSEEK_API_KEY")       # platform.deepseek.com
+    OPENROUTER_API_KEY        = os.getenv("OPENROUTER_API_KEY")     # openrouter.ai  (free models)
+    CEREBRAS_API_KEY          = os.getenv("CEREBRAS_API_KEY")       # cloud.cerebras.ai (free tier)

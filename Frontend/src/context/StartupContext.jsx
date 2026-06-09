@@ -725,6 +725,32 @@ export const StartupProvider = ({ children }) => {
       try {
         result = await submitRoadmap(sessionId, team);
       } catch (apiErr) {
+        const isTimeout = apiErr.message === 'ROADMAP_TIMEOUT';
+        if (isTimeout) {
+          // Backend is still generating — poll DB every 10s for up to 3 minutes
+          showToast('Generation is taking longer than usual. Polling for result…', 'info');
+          for (let i = 0; i < 18; i++) {
+            await new Promise(r => setTimeout(r, 10_000));
+            try {
+              const { fetchSessionRoadmap } = await import('../services/startupApi');
+              const dbRoadmap = await fetchSessionRoadmap(sessionId);
+              if (dbRoadmap?.branches?.length > 0) {
+                const fallbackNodes = _buildRoadmapNodes({
+                  branch_roadmaps: dbRoadmap.branches,
+                  profiler_output: dbRoadmap.profiler,
+                  startup_name: dbRoadmap.profiler?.startup_name || startupDetails.startupName,
+                });
+                setRoadmapNodesRaw(fallbackNodes);
+                setRoadmapDataRaw(dbRoadmap);
+                try { sessionStorage.setItem('sx_roadmap_nodes', JSON.stringify(fallbackNodes)); } catch {}
+                showToast('Roadmap generated successfully!', 'success');
+                return dbRoadmap;
+              }
+            } catch { /* keep polling */ }
+          }
+          throw new Error('Roadmap generation timed out. Please try again.');
+        }
+
         console.warn('[Roadmap] API generation failed:', apiErr.message);
 
         // ── DB Fallback: load previously generated roadmap from Supabase ──

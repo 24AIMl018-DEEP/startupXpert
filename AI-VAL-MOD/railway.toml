@@ -7,3 +7,5 @@ healthcheckPath = "/health"
 healthcheckTimeout = 120
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
+tcpProxyApplicationPort = 8000
+railwayConfigFile = "railway.toml"

@@ -125,16 +125,31 @@ export async function fetchLatestSession(userId) {
 
 export async function submitRoadmap(sessionId, team = []) {
   const headers = await getAuthHeaders();
-  const res = await fetch(`${ROADMAP_URL}/api/v1/roadmap`, {
-    method:  'POST',
-    headers,
-    body:    JSON.stringify({ session_id: sessionId, team }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Roadmap API error: ${res.status}`);
+  // Railway HTTP proxy enforces a ~100s hard timeout — use AbortController
+  // so we can detect the cutoff and fall back to polling DB instead of hanging.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 95_000);
+  try {
+    const res = await fetch(`${ROADMAP_URL}/api/v1/roadmap`, {
+      method:  'POST',
+      headers,
+      body:    JSON.stringify({ session_id: sessionId, team }),
+      signal:  controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Roadmap API error: ${res.status}`);
+    }
+    return res.json();
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      // Backend is still running — poll DB until roadmap appears (max ~3min)
+      throw new Error('ROADMAP_TIMEOUT');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
-  return res.json();
 }
 
 // Fetch saved roadmap for a session from DB

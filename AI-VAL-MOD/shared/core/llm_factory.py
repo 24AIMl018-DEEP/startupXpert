@@ -1,62 +1,71 @@
 import asyncio
 import concurrent.futures
+import logging
 import time
 import requests
 from groq import AsyncGroq
 from openai import AsyncOpenAI
 from shared.core.config import Config
 
+# Suppress noisy TCPTransport-closed errors from httpx/anyio during event loop teardown
+logging.getLogger("asyncio").setLevel(logging.CRITICAL)
 
-# ── Async runner (for Groq + NVIDIA only) ────────────────────────────────────
-# Ollama uses a plain synchronous requests call — no event loop needed.
-# Groq and NVIDIA use their async SDKs, so we bridge them here.
+logger = logging.getLogger(__name__)
+
+
+# ── Async runner ──────────────────────────────────────────────────────────────
 
 def _run_async(coro):
-    """
-    Run an async coroutine from sync code without nesting event loops.
-    Works correctly when called from LangGraph's run_in_executor threads.
-    """
     try:
         asyncio.get_running_loop()
-        # Already inside an event loop (e.g. LangGraph async context) —
-        # delegate to a fresh thread that creates its own loop.
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
             return pool.submit(asyncio.run, coro).result()
     except RuntimeError:
-        # No running loop — safe to create one directly.
         return asyncio.run(coro)
 
 
-# ── LLM provider calls ────────────────────────────────────────────────────────
+# ── Provider coroutines ───────────────────────────────────────────────────────
 
 async def _groq(prompt: str, temperature: float) -> str:
     client = AsyncGroq(api_key=Config.GROQ_API_KEY)
-    res = await client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        model="llama-3.3-70b-versatile",
-        temperature=temperature,
-    )
-    return res.choices[0].message.content
+    try:
+        res = await client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            temperature=temperature,
+        )
+        return res.choices[0].message.content
+    finally:
+        try:
+            await client.close()
+        except Exception:
+            pass
 
 
-async def _nvidia(prompt: str, temperature: float) -> str:
-    client = AsyncOpenAI(
-        api_key=Config.NVIDIA_API_KEY,
-        base_url="https://integrate.api.nvidia.com/v1",
-    )
-    res = await client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        model="meta/llama-3.3-70b-instruct",
-        temperature=temperature,
-    )
-    return res.choices[0].message.content
+async def _openai_compat(
+    prompt: str,
+    temperature: float,
+    api_key: str,
+    base_url: str,
+    model: str,
+) -> str:
+    """Generic async caller for any OpenAI-compatible endpoint."""
+    client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+    try:
+        res = await client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model=model,
+            temperature=temperature,
+        )
+        return res.choices[0].message.content
+    finally:
+        try:
+            await client.close()
+        except Exception:
+            pass
 
 
 def _ollama_sync(prompt: str) -> str:
-    """
-    Fully synchronous Ollama call using requests — no event loop dependency.
-    Uses /api/chat with format:'json' for reliable JSON output.
-    """
     url = f"{Config.OLLAMA_BASE_URL.rstrip('/')}/api/chat"
     payload = {
         "model": Config.OLLAMA_MODEL,
@@ -83,84 +92,155 @@ def _ollama_sync(prompt: str) -> str:
     return content
 
 
-# ── Tier dispatch ─────────────────────────────────────────────────────────────
+# ── Provider registry ─────────────────────────────────────────────────────────
+#
+# Each entry:
+#   id          – unique int used in tiers_to_try lists
+#   name        – display name in logs
+#   available() – returns True only if the required API key is set
+#   call(p, t)  – executes the LLM call, returns str
+#
+# Fallback order when Groq (primary) is rate-limited:
+#   Groq(2) → DeepSeek(4) → Cerebras(5) → Together(6) → OpenRouter(7) → NVIDIA(3) → Ollama(1)
+#
+# DeepSeek & Cerebras come first because they are fastest and most reliable
+# among the free-tier providers. OpenRouter is last (free model, slower).
 
-def get_llm(tier: int, temperature: float = None):
-    temp = temperature if temperature is not None else Config.DEFAULT_TEMPERATURE
-    if tier == 1:
-        return lambda prompt: _ollama_sync(prompt)
-    elif tier == 2:
-        if not Config.GROQ_API_KEY:
-            raise ValueError("GROQ_API_KEY missing in .env")
-        return lambda prompt: _run_async(_groq(prompt, temp))
-    elif tier == 3:
-        if not Config.NVIDIA_API_KEY:
-            raise ValueError("NVIDIA_API_KEY missing in .env")
-        return lambda prompt: _run_async(_nvidia(prompt, temp))
-    raise ValueError(f"Invalid tier {tier}. Use 1, 2, or 3.")
+_PROVIDERS = {
+    1: {
+        "name": "Ollama (local)",
+        "available": lambda: True,  # always try; will fail gracefully if not running
+        "call": lambda p, t: _ollama_sync(p),
+    },
+    2: {
+        "name": "Groq",
+        "available": lambda: bool(Config.GROQ_API_KEY),
+        "call": lambda p, t: _run_async(_groq(p, t)),
+    },
+    3: {
+        "name": "NVIDIA NIM",
+        "available": lambda: bool(Config.NVIDIA_API_KEY),
+        "call": lambda p, t: _run_async(_openai_compat(
+            p, t,
+            api_key=Config.NVIDIA_API_KEY,
+            base_url="https://integrate.api.nvidia.com/v1",
+            model="meta/llama-3.3-70b-instruct",
+        )),
+    },
+    4: {
+        "name": "DeepSeek",
+        "available": lambda: bool(Config.DEEPSEEK_API_KEY),
+        "call": lambda p, t: _run_async(_openai_compat(
+            p, t,
+            api_key=Config.DEEPSEEK_API_KEY,
+            base_url="https://api.deepseek.com/v1",
+            model="deepseek-chat",
+        )),
+    },
+    5: {
+        "name": "Cerebras",
+        "available": lambda: bool(Config.CEREBRAS_API_KEY),
+        "call": lambda p, t: _run_async(_openai_compat(
+            p, t,
+            api_key=Config.CEREBRAS_API_KEY,
+            base_url="https://api.cerebras.ai/v1",
+            model="llama-3.3-70b",
+        )),
+    },
+    6: {
+        "name": "OpenRouter (free)",
+        "available": lambda: bool(Config.OPENROUTER_API_KEY),
+        "call": lambda p, t: _run_async(_openai_compat(
+            p, t,
+            api_key=Config.OPENROUTER_API_KEY,
+            base_url="https://openrouter.ai/api/v1",
+            model="deepseek/deepseek-r1:free",
+        )),
+    },
+}
+
+# Default fallback chain — most reliable free providers first, Ollama last
+_DEFAULT_CHAIN = [2, 4, 5, 6, 3, 1]  # Groq → DeepSeek → Cerebras → OpenRouter → NVIDIA → Ollama
 
 
-# ── Cascading fallback with retries ───────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 
-_RETRY_DELAYS = [2, 5, 10]
-
+_QUOTA_ERRORS = ("tokens per day", "daily", "tpd", "quota", "insufficient_quota", "billing")
 
 def _is_rate_limit(err: Exception) -> bool:
     s = str(err).lower()
     return "429" in s or "rate" in s or "quota" in s or "limit" in s
 
-
-_TIER_NAMES = {1: "Ollama (local)", 2: "Groq", 3: "NVIDIA"}
-
-# On daily quota exhausted, skip retries and go straight to Ollama
-_QUOTA_ERRORS = ("tokens per day", "daily", "tpd", "quota")
-
 def _is_quota_exhausted(err: Exception) -> bool:
     s = str(err).lower()
     return any(q in s for q in _QUOTA_ERRORS)
 
-def call_llm_with_fallback(prompt: str, tier: int, temperature: float = None) -> str:
+
+# ── Public API ────────────────────────────────────────────────────────────────
+
+def get_llm(tier: int, temperature: float = None):
+    """Return a callable(prompt) -> str for the given provider tier id."""
     temp = temperature if temperature is not None else Config.DEFAULT_TEMPERATURE
-    # Always try requested tier first, then the other cloud tier, and finally Ollama (local)
-    if tier == 1:
-        tiers_to_try = [1, 2, 3]  # Ollama -> Groq -> NVIDIA
-    elif tier == 2:
-        tiers_to_try = [2, 3, 1]  # Groq -> NVIDIA -> Ollama
-    else:
-        tiers_to_try = [3, 2, 1]  # NVIDIA -> Groq -> Ollama
+    provider = _PROVIDERS.get(tier)
+    if not provider:
+        raise ValueError(f"Unknown tier {tier}. Valid ids: {list(_PROVIDERS)}")
+    return lambda prompt: provider["call"](prompt, temp)
+
+
+_RETRY_DELAYS = [2, 5, 10]
+
+
+def call_llm_with_fallback(prompt: str, tier: int, temperature: float = None) -> str:
+    """
+    Try `tier` first, then walk the fallback chain until one succeeds.
+    Skips providers whose API key is not configured.
+    """
+    temp = temperature if temperature is not None else Config.DEFAULT_TEMPERATURE
+
+    # Build ordered list: requested tier first, then the rest of the chain
+    chain = [tier] + [t for t in _DEFAULT_CHAIN if t != tier]
 
     last_err = None
-    for current_tier in tiers_to_try:
-        # For Ollama (tier 1) — no retries, just one attempt
+    for current_tier in chain:
+        provider = _PROVIDERS.get(current_tier)
+        if not provider:
+            continue
+        if not provider["available"]():
+            logger.debug(f"[LLM] Skipping {provider['name']} — API key not set")
+            continue
+
+        # Ollama gets a single attempt; cloud providers get retries on rate-limit
         retry_delays = [] if current_tier == 1 else _RETRY_DELAYS
 
         for attempt, delay in enumerate([0] + retry_delays):
             if delay:
-                print(f"[LLM] Retry {attempt} after {delay}s ({_TIER_NAMES.get(current_tier)})...")
+                logger.info(f"[LLM] Retry {attempt} after {delay}s ({provider['name']})...")
                 time.sleep(delay)
             try:
                 t_start = time.time()
-                result = get_llm(tier=current_tier, temperature=temp)(prompt)
+                result = provider["call"](prompt, temp)
                 elapsed = round(time.time() - t_start, 1)
-                tier_name = _TIER_NAMES.get(current_tier, f"tier-{current_tier}")
                 if current_tier != tier:
-                    print(f"[LLM] ✓ FALLBACK — used {tier_name} (requested {_TIER_NAMES.get(tier)}) — {elapsed}s — {len(result)} chars")
+                    logger.info(
+                        f"[LLM] ✓ FALLBACK — used {provider['name']} "
+                        f"(requested {_PROVIDERS[tier]['name']}) — {elapsed}s — {len(result)} chars"
+                    )
                 else:
-                    print(f"[LLM] ✓ {tier_name} — {elapsed}s — {len(result)} chars")
+                    logger.info(f"[LLM] ✓ {provider['name']} — {elapsed}s — {len(result)} chars")
                 return result
             except Exception as e:
                 last_err = e
-                print(f"[LLM] ✗ {_TIER_NAMES.get(current_tier)} error: {str(e)[:120]}")
-                # If daily quota exhausted → skip ALL retries, jump straight to Ollama
+                logger.warning(f"[LLM] ✗ {provider['name']} error: {str(e)[:120]}")
                 if _is_quota_exhausted(e):
-                    print(f"[LLM] Daily quota exhausted on {_TIER_NAMES.get(current_tier)} → skipping retries")
-                    break  # skip retries for this tier, try next in tiers_to_try
+                    logger.info(f"[LLM] Quota exhausted on {provider['name']} → skipping retries")
+                    break
                 if not _is_rate_limit(e):
-                    break  # non-rate-limit error → skip retries, try next tier
+                    break  # non-rate-limit → don't retry, try next provider
 
-        print(f"[LLM] {_TIER_NAMES.get(current_tier)} exhausted → trying next fallback...")
+        logger.info(f"[LLM] {provider['name']} exhausted → trying next fallback...")
 
     raise RuntimeError(
-        f"[LLM] All tiers exhausted (tried {[_TIER_NAMES.get(t) for t in tiers_to_try]}). "
+        f"[LLM] All providers exhausted. Chain tried: "
+        f"{[_PROVIDERS[t]['name'] for t in chain if _PROVIDERS.get(t) and _PROVIDERS[t]['available']()]}. "
         f"Last error: {last_err}"
     )
