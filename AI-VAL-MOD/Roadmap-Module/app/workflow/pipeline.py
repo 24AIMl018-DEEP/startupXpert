@@ -9,7 +9,7 @@ from workflow.graph import build_graph
 from workflow.nodes.profiler_node import profiler_node
 from services.validation_fetcher import fetch_validation_context
 from services.db.reader import get_startup_input
-from services.db.writer import write_profiler, write_branch, write_tasks
+from services.db.writer import write_profiler, write_branch, write_tasks, delete_roadmap_for_session
 
 
 async def run_roadmap_pipeline(
@@ -31,6 +31,8 @@ async def run_roadmap_pipeline(
     })
 
     print(f"\n{'='*60}\n[Roadmap] START — {startup_data.startup_name} | session={session_id}\n{'='*60}")
+
+    delete_roadmap_for_session(session_id)
 
     validation_ctx = fetch_validation_context(session_id)
 

@@ -37,6 +37,24 @@ def _update(table: str, row_id: str, payload: dict) -> Optional[Dict]:
 
 # ── Roadmap writes ─────────────────────────────────────────────────────────────
 
+def delete_roadmap_for_session(session_id: str) -> None:
+    try:
+        from shared.db.supabase_client import get_supabase
+        db = get_supabase()
+        
+        branches_res = db.table("roadmap_branches").select("id").eq("session_id", session_id).execute()
+        branch_ids = [b["id"] for b in (branches_res.data or [])]
+        
+        if branch_ids:
+            db.table("roadmap_tasks").delete().in_("branch_id", branch_ids).execute()
+            
+        db.table("roadmap_branches").delete().eq("session_id", session_id).execute()
+        db.table("roadmap_profiler").delete().eq("session_id", session_id).execute()
+        
+        logger.info("[DBWriter] Deleted existing roadmap for session_id=%s", session_id)
+    except Exception as e:
+        logger.error("[DBWriter] Error deleting existing roadmap: %s", e)
+
 def write_profiler(session_id: str, startup_name: str, profiler: Dict) -> Optional[str]:
     row = _insert("roadmap_profiler", {
         "session_id":            session_id,
