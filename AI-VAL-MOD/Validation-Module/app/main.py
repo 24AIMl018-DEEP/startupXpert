@@ -123,12 +123,20 @@ def health():
 
 # IMPORTANT: response_model removed — Pydantic schema mismatch crash se CORS strip hota tha
 @app.post("/api/v1/validate")
-async def validate(startup_data: StartupInput):
+async def validate(request: Request, startup_data: StartupInput):
+    origin = request.headers.get("origin", "*")
     try:
         return await run_pipeline(startup_data)
     except Exception as e:
         logger.error(f"[API] Validation pipeline error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return JSONResponse(
+            status_code=500,
+            content={"detail": str(e)},
+            headers={
+                "Access-Control-Allow-Origin": origin,
+                "Access-Control-Allow-Credentials": "true",
+            }
+        )
 
 
 from fastapi import Depends

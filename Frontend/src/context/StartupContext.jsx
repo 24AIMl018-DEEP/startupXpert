@@ -356,13 +356,15 @@ export const StartupProvider = ({ children }) => {
   };
 
   const saveSettings = (newSettings) => {
+    // Apply settings immediately so theme/mode changes take effect at once.
+    // A brief loading indicator is still shown for user feedback.
+    setSettings(newSettings);
+    localStorage.setItem('startup_settings', JSON.stringify(newSettings));
     setLoadingState(true);
     setTimeout(() => {
-      setSettings(newSettings);
-      localStorage.setItem('startup_settings', JSON.stringify(newSettings));
       setLoadingState(false);
       showToast('Settings saved successfully!', 'success');
-    }, 800);
+    }, 600);
   };
 
   const resetSettingsDefaults = () => {
