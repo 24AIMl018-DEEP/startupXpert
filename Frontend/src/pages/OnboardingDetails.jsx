@@ -52,7 +52,9 @@ const OnboardingDetails = () => {
     techComplexity:      startupDetails.techComplexity       || '',
     mvpTimeline:         startupDetails.mvpTimeline          || '',
     scalabilityGoal:     startupDetails.scalabilityGoal      || '',
-    acquisitionStrategy: startupDetails.acquisitionStrategy  || '',
+    acquisitionStrategy: Array.isArray(startupDetails.acquisitionStrategy)
+      ? startupDetails.acquisitionStrategy
+      : (startupDetails.acquisitionStrategy ? [startupDetails.acquisitionStrategy] : []),
     startupStage:        startupDetails.startupStage         || '',
   });
 
@@ -61,23 +63,99 @@ const OnboardingDetails = () => {
   const [animateClass, setAnimateClass] = useState('opacity-100 translate-x-0');
 
   const fields = [
-    { id: 'startupName',         label: 'Startup Name',              description: 'What is the working name of your venture?',                                            type: 'text',        placeholder: 'e.g. VentureAI',                                             required: true },
-    { id: 'startupDomain',       label: 'Startup Domain',            description: 'Select the primary industry domain that describes your business.',                     type: 'select',      placeholder: 'Choose domain',                                              required: true, options: [{ value: 'HealthTech', label: 'HealthTech' }, { value: 'EdTech', label: 'EdTech' }, { value: 'FinTech', label: 'FinTech' }, { value: 'AgriTech', label: 'AgriTech' }, { value: 'E-Commerce', label: 'E-Commerce' }, { value: 'SaaS', label: 'SaaS' }, { value: 'Other', label: 'Other' }] },
-    { id: 'problemStatement',    label: 'Problem Statement',         description: 'What critical pain point does your startup solve?',                                    type: 'textarea',    placeholder: 'Describe the core problem in detail...',                     required: true },
-    { id: 'startupDescription',  label: 'Startup Description',       description: 'Describe your product or service and how it resolves the problem.',                    type: 'textarea',    placeholder: 'Describe the startup proposal...',                           required: true },
-    { id: 'targetAudience',      label: 'Target Audience',           description: 'Who is your ideal customer profile (ICP)?',                                            type: 'text',        placeholder: 'e.g. B2B marketers, Gen Z students',                         required: true },
-    { id: 'geographicMarket',    label: 'Geographic Market',         description: 'Where is your primary launching territory or geographic scope?',                       type: 'text',        placeholder: 'e.g. Southeast Asia, Global remote',                         required: true },
-    { id: 'existingCompetitors', label: 'Existing Competitors',      description: 'List any key competitors or alternatives in this space.',                               type: 'text',        placeholder: 'e.g. Manual Excel tracking, Stripe Billing',                 required: true },
-    { id: 'revenueModel',        label: 'Revenue Model',             description: 'How does your startup plan to monetize its offering?',                                 type: 'select',      placeholder: 'Choose revenue model',                                       required: true, options: [{ value: 'Subscription', label: 'Subscription' }, { value: 'Freemium', label: 'Freemium' }, { value: 'One-time', label: 'One-time License' }, { value: 'Commission', label: 'Commission / Marketplace' }, { value: 'Ads', label: 'Advertising / Data' }, { value: 'Other', label: 'Other' }] },
-    { id: 'estimatedPricing',    label: 'Estimated Pricing',         description: 'What is the target price-point or average subscription fee?',                          type: 'text',        placeholder: 'e.g. ₹499/month, $19/user/month',                            required: true },
-    { id: 'availableFunding',    label: 'Available Funding',         description: 'Select your current funding or bootstrap resources.',                                  type: 'select',      placeholder: 'Choose funding range',                                       required: true, options: [{ value: 'Bootstrapped', label: 'Bootstrapped' }, { value: '<₹1L', label: 'Seed budget < ₹1 Lakh' }, { value: '₹1L-10L', label: 'Angel budget ₹1L–₹10L' }, { value: '₹10L-1Cr', label: 'Pre-seed ₹10L–₹1Cr' }, { value: 'VC Funded', label: 'VC Funded' }] },
-    { id: 'monthlyBurnCapacity', label: 'Monthly Burn Capacity',     description: 'How much operational capital are you comfortable burning each month?',                  type: 'text',        placeholder: 'e.g. ₹20,000/month, $5,000/month',                           required: true },
-    { id: 'platformType',        label: 'Platform Type',             description: 'Choose your target platforms (select all that apply).',                                type: 'pills-multi', options: ['Web App', 'Mobile App', 'API', 'Desktop', 'SaaS'],              required: true },
-    { id: 'techComplexity',      label: 'Technology Complexity',     description: 'Rate the technical implementation depth of the product.',                              type: 'pills-single',options: ['Low', 'Medium', 'High'],                                           required: true },
-    { id: 'mvpTimeline',         label: 'MVP Timeline',              description: 'What is your timeline goal to launch a minimal working prototype?',                    type: 'pills-single',options: ['1 month', '3 months', '6 months', '12 months'],                  required: true },
-    { id: 'scalabilityGoal',     label: 'Scalability Goal',          description: 'What is your growth target or geographic scaling limit?',                               type: 'pills-single',options: ['Local', 'National', 'Global'],                                      required: true },
-    { id: 'acquisitionStrategy', label: 'Customer Acquisition',      description: 'How do you plan to acquire your first 100 paying customers?',                         type: 'textarea',    placeholder: 'Describe your cold outreach, SEO, or performance marketing...', required: true },
-    { id: 'startupStage',        label: 'Current Startup Stage',     description: 'Select the statement that matches your current operational maturity.',                  type: 'pills-single',options: ['Idea', 'Validation', 'MVP', 'Growth', 'Scaling'],               required: true },
+    {
+      id: 'startupName', label: 'Startup Name',
+      description: 'What is the working name of your venture?',
+      type: 'text', placeholder: 'e.g. VentureAI', required: true,
+    },
+    {
+      id: 'startupDomain', label: 'Startup Domain',
+      description: 'Which industry best describes your startup? Pick the closest match.',
+      type: 'pills-single', required: true,
+      options: ['HealthTech', 'EdTech', 'FinTech', 'AgriTech', 'E-Commerce', 'SaaS', 'AI / ML', 'CleanTech', 'LegalTech', 'HRTech', 'PropTech', 'Other'],
+    },
+    {
+      id: 'problemStatement', label: 'Problem Statement',
+      description: 'What critical pain point does your startup solve?',
+      type: 'textarea', placeholder: 'Describe the core problem in 2–4 sentences…', required: true,
+    },
+    {
+      id: 'startupDescription', label: 'Startup Description',
+      description: 'Describe your product or service and how it resolves the problem.',
+      type: 'textarea', placeholder: 'What does your product do? How is it different?', required: true,
+    },
+    {
+      id: 'targetAudience', label: 'Target Audience',
+      description: 'Who is your ideal customer? Describe them in plain English.',
+      type: 'text', placeholder: 'e.g. College students aged 18–24 in India', required: true,
+    },
+    {
+      id: 'geographicMarket', label: 'Geographic Market',
+      description: 'Where will you launch first? (City, country, or region)',
+      type: 'text', placeholder: 'e.g. India → SEA → Global', required: true,
+    },
+    {
+      id: 'existingCompetitors', label: 'Existing Competitors',
+      description: 'Name your top 2–4 competitors or alternatives users use today.',
+      type: 'text', placeholder: 'e.g. Notion, Habitica, Duolingo', required: true,
+    },
+    {
+      id: 'revenueModel', label: 'Revenue Model',
+      description: 'How does your startup plan to make money?',
+      type: 'pills-single', required: true,
+      options: ['Freemium SaaS', 'Subscription', 'One-time License', 'Commission / Marketplace', 'Advertising', 'Usage-based', 'Enterprise B2B', 'Other'],
+    },
+    {
+      id: 'estimatedPricing', label: 'Estimated Pricing',
+      description: 'What will you charge? Give a specific number or range.',
+      type: 'text', placeholder: 'e.g. ₹499/month, Free + ₹999 pro plan', required: true,
+    },
+    {
+      id: 'availableFunding', label: 'Available Funding',
+      description: 'What is your current funding situation?',
+      type: 'pills-single', required: true,
+      options: ['Bootstrapped', 'Under ₹1 Lakh', '₹1L – ₹10L', '₹10L – ₹1Cr', 'VC Funded', 'Grant / Government', 'Other'],
+    },
+    {
+      id: 'monthlyBurnCapacity', label: 'Monthly Burn Capacity',
+      description: 'How much can you spend per month running this startup?',
+      type: 'text', placeholder: 'e.g. ₹8,000/month, $500/month', required: true,
+    },
+    {
+      id: 'platformType', label: 'Platform Type',
+      description: 'Where will your product live? Select all that apply.',
+      type: 'pills-multi', required: true,
+      options: ['Web Application', 'Mobile App (iOS)', 'Mobile App (Android)', 'API / Backend', 'Desktop App', 'Browser Extension', 'Other'],
+    },
+    {
+      id: 'techComplexity', label: 'Technology Complexity',
+      description: 'How technically complex is your MVP to build?',
+      type: 'pills-single', required: true,
+      options: ['Low', 'Medium', 'High'],
+    },
+    {
+      id: 'mvpTimeline', label: 'MVP Timeline',
+      description: 'How long until you can ship a working MVP?',
+      type: 'pills-single', required: true,
+      options: ['2–4 weeks', '1–2 months', '3 months', '6 months', '10 weeks', '12+ months'],
+    },
+    {
+      id: 'scalabilityGoal', label: 'Scalability Goal',
+      description: 'What is your user/revenue growth target in the first 18 months?',
+      type: 'text', placeholder: 'e.g. 50,000 active users, $100K ARR', required: true,
+    },
+    {
+      id: 'acquisitionStrategy', label: 'Customer Acquisition',
+      description: 'How will you get your first 100–1000 users? Pick all that apply.',
+      type: 'pills-multi', required: true,
+      options: ['SEO / Content Marketing', 'Social Media (LinkedIn/Instagram)', 'Discord / Community', 'Referral / Gamification', 'Cold Outreach / DMs', 'Paid Ads', 'Creator / Influencer Partnerships', 'Product Hunt Launch', 'College Campuses', 'App Store Organic', 'Other'],
+    },
+    {
+      id: 'startupStage', label: 'Current Startup Stage',
+      description: 'Where are you right now with your startup?',
+      type: 'pills-single', required: true,
+      options: ['Just an Idea', 'Validation', 'MVP Development', 'Beta / Early Users', 'Revenue Stage', 'Scaling'],
+    },
   ];
 
   const currentField = fields[currentFieldIndex];
@@ -99,7 +177,7 @@ const OnboardingDetails = () => {
     const val = formData[currentField.id];
     if (currentField.required) {
       if (currentField.type === 'pills-multi') {
-        if (!val || val.length === 0) { setError('Please select at least one platform option.'); return false; }
+        if (!val || val.length === 0) { setError('Please select at least one option.'); return false; }
       } else {
         if (!val || (typeof val === 'string' && !val.trim())) { setError(`"${currentField.label}" is required to proceed.`); return false; }
       }
@@ -194,7 +272,7 @@ const OnboardingDetails = () => {
             </div>
 
             {/* Input rendering */}
-            <div style={{ minHeight: 100, display: 'flex', alignItems: 'center' }}>
+            <div style={{ minHeight: 100, display: 'flex', flexDirection: 'column', gap: 10 }}>
               {currentField.type === 'text' && (
                 <InputField name={currentField.id} value={formData[currentField.id]} onChange={handleInputChange}
                   placeholder={currentField.placeholder} error={error} required={currentField.required} aria-label={currentField.label} />
@@ -205,14 +283,9 @@ const OnboardingDetails = () => {
                   placeholder={currentField.placeholder} error={error} rows={4} required={currentField.required} aria-label={currentField.label} />
               )}
 
-              {currentField.type === 'select' && (
-                <InputField type="select" name={currentField.id} value={formData[currentField.id]} onChange={handleInputChange}
-                  placeholder={currentField.placeholder} options={currentField.options} error={error} required={currentField.required} aria-label={currentField.label} />
-              )}
-
               {currentField.type === 'pills-single' && (
                 <div style={{ width: '100%' }} role="group" aria-label={currentField.label}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
                     {currentField.options.map(opt => (
                       <button key={opt} type="button" onClick={() => handlePillSingleSelect(opt)} aria-pressed={formData[currentField.id] === opt}
                         className={`pill${formData[currentField.id] === opt ? ' active' : ''}`}>
@@ -220,17 +293,25 @@ const OnboardingDetails = () => {
                       </button>
                     ))}
                   </div>
-                  {error && (
-                    <p className="field-error" style={{ marginTop: 8 }}>
-                      <AlertCircle size={12} /> {error}
-                    </p>
+                  {/* Free-text for "Other" */}
+                  {formData[currentField.id] === 'Other' && (
+                    <input
+                      style={{ marginTop: 10 }}
+                      name={currentField.id}
+                      value={formData[currentField.id + '_other'] || ''}
+                      onChange={e => {
+                        setFormData(prev => ({ ...prev, [currentField.id]: e.target.value || 'Other', [currentField.id + '_other']: e.target.value }));
+                      }}
+                      placeholder={`Describe your ${currentField.label.toLowerCase()}…`}
+                    />
                   )}
+                  {error && <p className="field-error" style={{ marginTop: 8 }}><AlertCircle size={12} /> {error}</p>}
                 </div>
               )}
 
               {currentField.type === 'pills-multi' && (
                 <div style={{ width: '100%' }} role="group" aria-label={currentField.label}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 10 }}>
                     {currentField.options.map(opt => {
                       const isChecked = (formData[currentField.id] || []).includes(opt);
                       return (
@@ -243,11 +324,16 @@ const OnboardingDetails = () => {
                       );
                     })}
                   </div>
-                  {error && (
-                    <p className="field-error" style={{ marginTop: 8 }}>
-                      <AlertCircle size={12} /> {error}
-                    </p>
+                  {/* Free-text when "Other" is selected */}
+                  {(formData[currentField.id] || []).includes('Other') && (
+                    <input
+                      style={{ marginTop: 10 }}
+                      placeholder={`Describe your custom ${currentField.label.toLowerCase()}…`}
+                      value={formData[currentField.id + '_other'] || ''}
+                      onChange={e => setFormData(prev => ({ ...prev, [currentField.id + '_other']: e.target.value }))}
+                    />
                   )}
+                  {error && <p className="field-error" style={{ marginTop: 8 }}><AlertCircle size={12} /> {error}</p>}
                 </div>
               )}
             </div>

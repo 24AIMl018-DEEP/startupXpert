@@ -101,6 +101,17 @@ const AnalysisLoader = () => {
   const platform = PLATFORMS[activePlatform];
   const step     = AGENT_STEPS[Math.min(activeStep, AGENT_STEPS.length - 1)];
 
+  // ── Elapsed timer ────────────────────────────────────────────────────────
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (error || progress === 100) return;
+    const t = setInterval(() => setElapsed(s => s + 1), 1000);
+    return () => clearInterval(t);
+  }, [error, progress]);
+  const fmtTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const MAX_SECS = 300; // 5 min
+  const timerPct = Math.min((elapsed / MAX_SECS) * 100, 100);
+
   return (
     <div style={{ background: 'var(--bg)', minHeight: '100vh', display: 'flex', flexDirection: 'column', position: 'relative', overflow: 'hidden' }}>
       {/* Background dots */}
@@ -130,7 +141,7 @@ const AnalysisLoader = () => {
             <div className="animate-fade-up">
 
               {/* Top label */}
-              <div style={{ textAlign: 'center', marginBottom: 32 }}>
+              <div style={{ textAlign: 'center', marginBottom: 28 }}>
                 <div className="badge badge-brand" style={{ marginBottom: 12 }}>
                   <Sparkles size={10} /> AI Analysis Running
                 </div>
@@ -140,6 +151,22 @@ const AnalysisLoader = () => {
                 <p style={{ fontSize: 12, color: 'var(--text2)', height: 18, transition: 'opacity 0.3s', fontFamily: 'var(--font-mono)' }}>
                   {INTERESTING_LINES[textLine]}
                 </p>
+                {/* ── Elapsed timer + estimated time ── */}
+                <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  <div style={{ fontSize: 11, color: 'var(--text3)' }}>Estimated: <span style={{ color: 'var(--amber)', fontWeight: 700 }}>2–5 min</span></div>
+                  <div style={{ width: 1, height: 12, background: 'var(--border2)' }} />
+                  <div style={{ fontSize: 11, color: 'var(--text3)' }}>Elapsed: <span style={{ color: 'var(--brand-light)', fontWeight: 700, fontFamily: 'monospace' }}>{fmtTime(elapsed)}</span></div>
+                </div>
+                {/* Timer track */}
+                <div style={{ margin: '10px auto 0', maxWidth: 320, height: 3, borderRadius: 99, background: 'var(--surface3)', overflow: 'hidden' }}>
+                  <div style={{ width: `${timerPct}%`, height: '100%', borderRadius: 99, background: elapsed > 240 ? 'var(--amber)' : 'var(--brand)', transition: 'width 1s linear, background 0.5s' }} />
+                </div>
+                {elapsed > 60 && elapsed <= 180 && (
+                  <div style={{ marginTop: 8, fontSize: 11, color: 'var(--text3)' }}>AI agents are running in parallel — almost there ⚡</div>
+                )}
+                {elapsed > 180 && (
+                  <div style={{ marginTop: 8, fontSize: 11, color: 'var(--amber)', fontWeight: 600 }}>Taking longer than usual — backend is processing heavy agents…</div>
+                )}
               </div>
 
               {/* Main card */}

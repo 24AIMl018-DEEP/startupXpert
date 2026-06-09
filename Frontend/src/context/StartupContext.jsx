@@ -706,7 +706,9 @@ export const StartupProvider = ({ children }) => {
         technology_complexity:         details.techComplexity      || '',
         mvp_timeline:                  details.mvpTimeline         || '',
         scalability_goal:              details.scalabilityGoal     || '',
-        customer_acquisition_strategy: details.acquisitionStrategy || '',
+        customer_acquisition_strategy: Array.isArray(details.acquisitionStrategy)
+          ? details.acquisitionStrategy.join(', ')
+          : (details.acquisitionStrategy || ''),
         current_startup_stage:         details.startupStage        || '',
       };
 
