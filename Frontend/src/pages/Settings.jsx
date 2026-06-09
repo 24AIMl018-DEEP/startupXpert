@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useStartup } from '../context/StartupContext';
 import { useToast } from '../context/ToastContext';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Palette, Database, Trash2, RefreshCw, Save, ShieldAlert, Sparkles, Check, Zap, Moon, Sun } from 'lucide-react';
+import { Palette, Database, Trash2, RefreshCw, Save, ShieldAlert, Sparkles, Check, Zap, Moon, Sun, Monitor } from 'lucide-react';
 
 const THEMES = [
   {
@@ -40,6 +40,7 @@ const Settings = () => {
 
   const [formData, setFormData] = useState({
     theme: settings.theme || 'Dark Futurism',
+    themeMode: settings.themeMode || 'Dark',
     autoSaveDrafts: settings.autoSaveDrafts !== false,
     analysisPreference: settings.analysisPreference || 'Comprehensive',
   });
@@ -47,6 +48,7 @@ const Settings = () => {
   useEffect(() => {
     setFormData({
       theme: settings.theme || 'Dark Futurism',
+      themeMode: settings.themeMode || 'Dark',
       autoSaveDrafts: settings.autoSaveDrafts !== false,
       analysisPreference: settings.analysisPreference || 'Comprehensive',
     });
@@ -119,6 +121,33 @@ const Settings = () => {
                 </button>
               );
             })}
+          </div>
+
+          {/* Light / Dark mode toggle */}
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text1)', marginBottom: 2 }}>Display Mode</div>
+              <div style={{ fontSize: 11, color: 'var(--text3)' }}>Switch between dark and light appearance</div>
+            </div>
+            <div style={{ display: 'flex', gap: 6, padding: 3, background: 'var(--surface3)', borderRadius: 'var(--r-md)', border: '1px solid var(--border2)' }}>
+              {[{ val: 'Dark', Icon: Moon }, { val: 'Light', Icon: Sun }].map(({ val, Icon }) => {
+                const active = formData.themeMode === val;
+                return (
+                  <button key={val} type="button"
+                    onClick={() => { const u = { ...formData, themeMode: val }; setFormData(u); saveSettings(u); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px',
+                      borderRadius: 'var(--r)', border: 'none',
+                      background: active ? 'var(--brand)' : 'transparent',
+                      color: active ? '#fff' : 'var(--text3)',
+                      cursor: 'pointer', fontSize: 12, fontWeight: 700, transition: 'all 0.18s',
+                      boxShadow: active ? '0 2px 8px rgba(124,58,237,0.3)' : 'none',
+                    }}>
+                    <Icon size={12} /> {val}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
 
