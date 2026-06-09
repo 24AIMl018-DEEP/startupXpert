@@ -94,17 +94,17 @@ const Settings = () => {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
             {THEMES.map(t => {
               const active = formData.theme === t.id;
               return (
                 <button key={t.id} type="button" onClick={() => applyTheme(t.id)}
                   style={{
-                    padding: '16px 18px', borderRadius: 'var(--r-lg)',
+                    flex: 1, padding: '16px 18px', borderRadius: 'var(--r-lg)',
                     border: `1px solid ${active ? 'var(--brand)' : 'var(--border2)'}`,
                     background: active ? 'var(--brand-bg)' : 'var(--surface2)',
                     cursor: 'pointer', textAlign: 'left', transition: 'all 0.2s',
-                    position: 'relative', overflow: 'hidden',
+                    position: 'relative', overflow: 'hidden', minWidth: 0,
                   }}>
                   {active && (
                     <div style={{ position: 'absolute', top: 10, right: 10, width: 18, height: 18, borderRadius: '50%', background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
