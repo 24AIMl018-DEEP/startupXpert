@@ -94,7 +94,7 @@ def get_roadmap_branches(session_id: str) -> List[Dict]:
     """Get all branches for a session."""
     return _select("roadmap_branches", lambda t:
         t.select("*").eq("session_id", session_id)
-         .order("created_at", asc=True)
+         .order("created_at", ascending=True)
     )
 
 

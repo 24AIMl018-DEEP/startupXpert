@@ -154,7 +154,7 @@ _PROVIDERS = {
             p, t,
             api_key=Config.OPENROUTER_API_KEY,
             base_url="https://openrouter.ai/api/v1",
-            model="deepseek/deepseek-r1:free",
+            model="deepseek/deepseek-chat-v3-0324:free",
         )),
     },
 }
