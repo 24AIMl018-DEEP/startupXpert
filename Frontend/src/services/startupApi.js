@@ -622,13 +622,14 @@ export async function joinOrganization(inviteCode, userId, fullName, jobTitle, s
 // Get tasks assigned to a specific org member (for member dashboard)
 export async function getMemberTasks(userId) {
   if (!userId) return [];
-  // Get the org_member id
-  const { data: member } = await supabase
+  // Get all org_member records for the user
+  const { data: memberships } = await supabase
     .from('org_members')
     .select('id, org_id')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (!member) return [];
+    .eq('user_id', userId);
+  
+  if (!memberships || memberships.length === 0) return [];
+  const memberIds = memberships.map(m => m.id);
 
   const { data: tasks } = await supabase
     .from('roadmap_tasks')
@@ -640,7 +641,7 @@ export async function getMemberTasks(userId) {
         roadmap_profiler ( startup_name )
       )
     `)
-    .eq('assigned_member_id', member.id)
+    .in('assigned_member_id', memberIds)
     .order('created_at', { ascending: true });
 
   return (tasks || []).map(t => ({
