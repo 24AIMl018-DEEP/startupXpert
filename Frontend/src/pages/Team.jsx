@@ -229,7 +229,7 @@ const Team = () => {
                 type="text"
                 value={form.fullName}
                 onChange={e => setForm(p => ({ ...p, fullName: e.target.value }))}
-                placeholder="e.g., Aayushi"
+                placeholder="Full name"
                 required
               />
             </div>
@@ -239,7 +239,7 @@ const Team = () => {
                 type="email"
                 value={form.email}
                 onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                placeholder="e.g., ayu@gmail.com"
+                placeholder="email@example.com"
                 required
               />
             </div>
@@ -249,7 +249,7 @@ const Team = () => {
                 type="text"
                 value={form.role}
                 onChange={e => setForm(p => ({ ...p, role: e.target.value }))}
-                placeholder="e.g., AIML Developer"
+                placeholder="e.g. AIML Developer"
                 required
               />
             </div>
@@ -259,7 +259,7 @@ const Team = () => {
                 type="text"
                 value={form.skills}
                 onChange={e => setForm(p => ({ ...p, skills: e.target.value }))}
-                placeholder="e.g., React, Python, NLP"
+                placeholder="e.g. React, Python"
               />
             </div>
             <div style={{ gridColumn: 'span 1', display: 'flex' }}>
