@@ -100,9 +100,9 @@ const Register = () => {
       if (userType === 'org') {
         const skills = form.skills.split(',').map(s => s.trim()).filter(Boolean);
         if (orgMode === 'create') {
-          await createOrganization(form.orgName.trim(), form.orgDomain.trim() || null, uid);
+          await createOrganization(form.orgName.trim(), form.orgDomain.trim() || null, uid, form.email.trim().toLowerCase(), form.fullName.trim());
         } else {
-          await joinOrganization(form.inviteCode.trim(), uid, form.fullName, form.jobTitle, skills);
+          await joinOrganization(form.inviteCode.trim(), uid, form.fullName, form.jobTitle, skills, form.email.trim().toLowerCase());
         }
       }
 

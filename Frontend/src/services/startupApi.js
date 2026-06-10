@@ -525,7 +525,7 @@ export async function patchTask(taskId, fields) {
 // ── Organization APIs ──────────────────────────────────────────────────────────
 
 // Create a new organization (called by founder on register)
-export async function createOrganization(name, domain, userId) {
+export async function createOrganization(name, domain, userId, email, fullName) {
   const { data, error } = await supabase
     .from('organizations')
     .insert({ name, domain: domain || null, created_by: userId })
@@ -535,6 +535,8 @@ export async function createOrganization(name, domain, userId) {
   // Auto-add founder as org_members with role 'founder'
   await supabase.from('org_members').insert({
     org_id: data.id, user_id: userId, role: 'founder',
+    email: email || null,
+    full_name: fullName || null,
   });
   return data;
 }
@@ -599,7 +601,7 @@ export async function addOrganizationMember(orgId, email, fullName, role, skills
 }
 
 // Join org via invite code
-export async function joinOrganization(inviteCode, userId, fullName, jobTitle, skills) {
+export async function joinOrganization(inviteCode, userId, fullName, jobTitle, skills, email) {
   const { data: org, error } = await supabase
     .from('organizations')
     .select('id')
@@ -611,6 +613,7 @@ export async function joinOrganization(inviteCode, userId, fullName, jobTitle, s
     org_id: org.id, user_id: userId, role: 'member',
     full_name: fullName, job_title: jobTitle,
     skills: skills || [],
+    email: email || null
   });
   if (joinErr) throw new Error(joinErr.message);
   return org;
