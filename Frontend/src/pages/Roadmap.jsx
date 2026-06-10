@@ -115,64 +115,115 @@ const TaskNode = ({ task, isFounder, onClick, onEdit }) => {
   const isMilestone = task.milestone === true;
   const isBlocked   = task.depStatus === 'Blocked' || task.status === 'Blocked';
   const isDone      = task.completed || task.status === 'Done';
+  const isInProgress = task.depStatus === 'In Progress' || task.status === 'In Progress';
   const pc          = priorityColor(task.priority);
   const rm          = roleMeta(task.assigneeRole || task.assignedTo);
 
+  // Border and status colors matching styling guidelines
+  const borderColor = isMilestone 
+    ? 'var(--amber-border)' 
+    : isDone 
+    ? 'rgba(16, 185, 129, 0.4)' 
+    : isBlocked 
+    ? 'rgba(239, 68, 68, 0.4)' 
+    : isInProgress 
+    ? 'rgba(124, 93, 249, 0.4)' 
+    : 'var(--border2)';
+
+  const borderHoverColor = isMilestone 
+    ? 'var(--amber)' 
+    : isDone 
+    ? 'var(--green)' 
+    : isBlocked 
+    ? 'var(--red)' 
+    : 'var(--brand)';
+
   return (
     <div style={{
-      padding: '9px 11px', borderRadius: isMilestone ? 10 : 8, cursor: 'pointer', flexShrink: 0,
-      minWidth: 160, maxWidth: 192,
+      padding: '10px 12px', borderRadius: isMilestone ? 10 : 8, cursor: 'pointer', flexShrink: 0,
+      minWidth: 170, maxWidth: 196,
       background: isMilestone ? 'var(--amber-bg)' : 'var(--surface)',
-      border: `1.5px solid ${isMilestone ? 'var(--amber-border)' : isBlocked ? 'var(--red-border)' : 'var(--border2)'}`,
-      boxShadow: isMilestone ? '0 0 12px var(--amber-bg)' : 'none',
+      border: `1.5px solid ${borderColor}`,
+      boxShadow: isMilestone ? '0 0 12px var(--amber-bg)' : isDone ? '0 2px 8px rgba(16, 185, 129, 0.05)' : 'none',
       transition: 'all 0.15s',
       position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 6,
     }}
       onClick={onClick}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = isMilestone ? 'var(--amber)' : 'var(--brand-border)'; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = isMilestone ? 'var(--amber-border)' : isBlocked ? 'var(--red-border)' : 'var(--border2)'; }}>
+      onMouseEnter={e => { e.currentTarget.style.borderColor = borderHoverColor; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = borderColor; }}>
 
       {/* top row */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
         {isMilestone ? <Flag size={10} style={{ color: 'var(--amber)', flexShrink: 0 }} /> :
          isDone      ? <CheckCircle2 size={10} style={{ color: 'var(--green)', flexShrink: 0 }} /> :
          isBlocked   ? <Lock size={10} style={{ color: 'var(--red)', flexShrink: 0 }} /> :
          <Circle size={9} style={{ color: 'var(--text3)', flexShrink: 0 }} />}
-        <div style={{ width: 5, height: 5, borderRadius: '50%', background: pc, flexShrink: 0 }} />
-        {task.assignedTo && task.assignedTo !== 'Unassigned' && (
-          <span style={{
-            marginLeft: 'auto', fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap',
-            color: rm.color, background: rm.bg,
-            border: `1px solid ${rm.color}40`, borderRadius: 99, padding: '1px 6px',
-          }}>
-            {task.assignedTo.split(' ')[0]}
-          </span>
-        )}
+         
+        {/* Priority text */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: pc, flexShrink: 0 }} />
+          <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase' }}>{task.priority || 'Low'}</span>
+        </div>
+
         {isFounder && (
           <button onClick={e => { e.stopPropagation(); onEdit(); }} style={{
-            marginLeft: task.assignedTo && task.assignedTo !== 'Unassigned' ? 0 : 'auto',
-            width: 18, height: 18, borderRadius: 4, background: 'var(--surface3)',
+            marginLeft: 'auto',
+            width: 20, height: 20, borderRadius: 5, background: 'var(--surface3)',
             border: '1px solid var(--border2)', color: 'var(--text3)',
             cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          }}>
-            <Edit2 size={9} />
+            transition: 'color 0.15s, background 0.15s'
+          }}
+            onMouseEnter={e => { e.currentTarget.style.color = 'var(--text1)'; e.currentTarget.style.background = 'var(--surface2)'; }}
+            onMouseLeave={e => { e.currentTarget.style.color = 'var(--text3)'; e.currentTarget.style.background = 'var(--surface3)'; }}>
+            <Edit2 size={10} />
           </button>
         )}
       </div>
 
+      {/* Task title */}
       <div style={{
-        fontSize: 11, fontWeight: 600, lineHeight: 1.35, marginBottom: 3,
+        fontSize: 11, fontWeight: 600, lineHeight: 1.35,
         color: isDone ? 'var(--text3)' : 'var(--text1)',
         textDecoration: isDone ? 'line-through' : 'none',
       }}>
         {task.title || task.text}
       </div>
 
-      {task.timeline && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 9, color: 'var(--text3)' }}>
-          <Clock size={8} /> {task.timeline}
+      {/* Assignee Badge */}
+      {task.assignedTo && task.assignedTo !== 'Unassigned' && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap',
+            color: rm.color, background: rm.bg,
+            border: `1px solid ${rm.color}30`, borderRadius: 99, padding: '1px 6px',
+            display: 'inline-flex', alignItems: 'center', gap: 3
+          }}>
+            <User size={8} /> {task.assignedTo.split(' ')[0]} {task.assigneeRole && `(${task.assigneeRole})`}
+          </span>
         </div>
       )}
+
+      {/* Metadata footer */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, borderTop: '1px dashed var(--border)', paddingTop: 5, marginTop: 2 }}>
+        {task.timeline && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, color: 'var(--text3)' }}>
+            <Clock size={8} /> {task.timeline}
+          </div>
+        )}
+        {task.complexity && task.complexity !== 'Low' && (
+          <span style={{ fontSize: 8, color: 'var(--text2)', background: 'var(--surface2)', padding: '1px 4px', borderRadius: 4, border: '1px solid var(--border)' }}>
+            {task.complexity}
+          </span>
+        )}
+        {task.costImpact && task.costImpact !== 'None' && (
+          <span style={{ fontSize: 8, color: 'var(--amber)', background: 'var(--amber-bg)', padding: '1px 4px', borderRadius: 4, border: '1px solid var(--amber-border)' }}>
+            $ {task.costImpact}
+          </span>
+        )}
+      </div>
     </div>
   );
 };
@@ -196,19 +247,22 @@ const MilestoneDiamond = ({ title, onClick }) => (
 );
 
 // ── Task Edit Modal ───────────────────────────────────────────────────────────
-const TaskEditModal = ({ task, members, onSave, onClose }) => {
+const TaskEditModal = ({ task, members, onSave, onDelete, onClose, isFounder }) => {
   const [form, setForm] = useState({
-    title:      task.title || task.text || '',
-    timeline:   task.timeline || '',
-    priority:   task.priority || 'Medium',
-    assignedTo: task.assignedTo || 'Unassigned',
+    title:       task.title || task.text || '',
+    timeline:    task.timeline || '',
+    priority:    task.priority || 'Medium',
+    assignedTo:  task.assignedTo || 'Unassigned',
     description: task.description || '',
+    complexity:  task.complexity || 'Low',
+    costImpact:  task.costImpact || 'None',
+    depStatus:   task.depStatus || task.status || 'Ready',
   });
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} onClick={onClose}>
-      <div style={{ width: '100%', maxWidth: 400, background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()} className="animate-scale-in">
+      <div style={{ width: '100%', maxWidth: 440, background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()} className="animate-scale-in">
         <div style={{ padding: '16px 18px 12px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text1)' }}>Edit Task</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--text1)' }}>Edit Task Details</div>
           <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 7, background: 'var(--surface3)', border: '1px solid var(--border2)', color: 'var(--text3)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
         </div>
         <div style={{ padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -216,6 +270,7 @@ const TaskEditModal = ({ task, members, onSave, onClose }) => {
             <div className="field-label">Task Title</div>
             <input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="Task title…" />
           </div>
+          
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <div>
               <div className="field-label">Priority</div>
@@ -228,6 +283,28 @@ const TaskEditModal = ({ task, members, onSave, onClose }) => {
               <input value={form.timeline} onChange={e => setForm(p => ({ ...p, timeline: e.target.value }))} placeholder="e.g. Week 1–2" />
             </div>
           </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+            <div>
+              <div className="field-label">Complexity</div>
+              <select value={form.complexity} onChange={e => setForm(p => ({ ...p, complexity: e.target.value }))}>
+                {['Low', 'Medium', 'High'].map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="field-label">Cost Impact</div>
+              <select value={form.costImpact} onChange={e => setForm(p => ({ ...p, costImpact: e.target.value }))}>
+                {['None', 'Low', 'Medium', 'High'].map(c => <option key={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <div className="field-label">Status</div>
+              <select value={form.depStatus} onChange={e => setForm(p => ({ ...p, depStatus: e.target.value }))}>
+                {['Ready', 'In Progress', 'Done', 'Blocked'].map(s => <option key={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
           <div>
             <div className="field-label">Assign To</div>
             <select value={form.assignedTo} onChange={e => setForm(p => ({ ...p, assignedTo: e.target.value }))}>
@@ -235,12 +312,23 @@ const TaskEditModal = ({ task, members, onSave, onClose }) => {
               {members.map(m => <option key={m.name} value={m.name}>{m.name} ({m.role})</option>)}
             </select>
           </div>
+          
           <div>
             <div className="field-label">Description</div>
-            <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={2} placeholder="Task details…" style={{ resize: 'vertical' }} />
+            <textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={3} placeholder="Task details…" style={{ resize: 'vertical' }} />
           </div>
         </div>
         <div style={{ padding: '10px 18px 14px', display: 'flex', gap: 8 }}>
+          {isFounder && (
+            <button
+              onClick={() => { if (window.confirm("Are you sure you want to delete this task?")) { onDelete(); } }}
+              className="btn btn-outline"
+              style={{ borderColor: 'var(--red)', color: 'var(--red)', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+              <Trash2 size={13} /> Delete
+            </button>
+          )}
           <button onClick={onClose} className="btn btn-outline" style={{ flex: 1 }}>Cancel</button>
           <button onClick={() => { onSave(form); onClose(); }} className="btn btn-primary" style={{ flex: 1 }}>
             <Check size={13} /> Save Changes
@@ -584,6 +672,29 @@ const Roadmap = () => {
   const [editingTask,   setEditingTask]     = useState(null);
   const [teamMembers,   setTeamMembers]     = useState([]); // persisted across generate calls
 
+  useEffect(() => {
+    if (user?.userId) {
+      const fetchTeam = async () => {
+        try {
+          const { getMyOrganization } = await import('../services/startupApi');
+          const orgData = await getMyOrganization(user.userId);
+          if (orgData && orgData.members) {
+            const mapped = orgData.members.map(m => ({
+              id: m.id,
+              name: m.full_name,
+              role: m.job_title || m.role,
+              skills: Array.isArray(m.skills) ? m.skills : [],
+            }));
+            setTeamMembers(mapped);
+          }
+        } catch (err) {
+          console.warn('Failed to load team members:', err);
+        }
+      };
+      fetchTeam();
+    }
+  }, [user?.userId]);
+
   const isFounder = !user?.role || user?.role === 'Founder' || user?.role === 'founder';
   const displayData = activeSession || roadmapData;
   const branches = displayData?.branch_roadmaps || displayData?.branches || [];
@@ -612,8 +723,32 @@ const Roadmap = () => {
     // Update in roadmapNodes via context manageSubTask
     const branchNode = roadmapNodes.find(n => n.tasks?.some(t => t.id === taskId));
     if (branchNode) {
-      manageSubTask(branchNode.id, 'updateField', { id: taskId, fields });
+      // Find the member to see if their id needs to be linked
+      const selectedMember = teamMembers.find(m => m.name === fields.assignedTo);
+      const enrichedFields = {
+        ...fields,
+        assigned_member_id: selectedMember ? selectedMember.id : null,
+        assignee_role: selectedMember ? selectedMember.role : 'Founder',
+      };
+      
+      // Map status change to local completed flag
+      if (fields.depStatus === 'Done') {
+        enrichedFields.completed = true;
+      } else if (fields.depStatus) {
+        enrichedFields.completed = false;
+      }
+
+      manageSubTask(branchNode.id, 'updateField', { id: taskId, fields: enrichedFields });
       showToast('Task updated.', 'success');
+    }
+    setEditingTask(null);
+  };
+
+  const handleTaskDelete = (taskId, dbTaskId) => {
+    const branchNode = roadmapNodes.find(n => n.tasks?.some(t => t.id === taskId));
+    if (branchNode) {
+      manageSubTask(branchNode.id, 'delete', { id: taskId, dbTaskId });
+      showToast('Task deleted successfully.', 'info');
     }
     setEditingTask(null);
   };
@@ -702,7 +837,9 @@ const Roadmap = () => {
         <TaskEditModal
           task={editingTask}
           members={teamMembers}
+          isFounder={isFounder}
           onSave={(fields) => handleTaskSave(editingTask.id || editingTask.task_id, fields)}
+          onDelete={() => handleTaskDelete(editingTask.id || editingTask.task_id, editingTask.dbTaskId)}
           onClose={() => setEditingTask(null)}
         />
       )}

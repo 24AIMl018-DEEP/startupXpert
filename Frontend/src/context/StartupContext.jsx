@@ -135,12 +135,21 @@ export const StartupProvider = ({ children }) => {
         description: b.summary || '', status: 'In Progress', priority: 'Medium',
         isExpanded: true, recommendations: b.summary || '',
         tasks: (b.tasks || []).map((t, i) => ({
-          id: t.task_id || `t-${i}`, dbTaskId: t.id || null,
+          id: t.task_id || `t-${i}`,
+          dbTaskId: t.id || null,
+          title: t.title || '',
           text: `[${t.timeline || ''}] ${t.title}`.trim(),
-          completed: false, priority: t.priority || 'Medium',
-          assignedTo: t.assigned_to || '', complexity: t.complexity || '',
-          costImpact: t.cost_impact || '', description: t.description || '',
+          completed: t.dep_status === 'Done' || t.completed === true,
+          priority: t.priority || 'Medium',
+          assignedTo: t.assigned_to || 'Unassigned',
+          assigneeRole: t.assignee_role || '',
+          assignedMemberId: t.assigned_member_id || null,
+          complexity: t.complexity || 'Low',
+          costImpact: t.cost_impact || 'None',
+          depStatus: t.dep_status || 'Ready',
+          description: t.description || '',
           timeline: t.timeline || '',
+          blockedBy: t.blocked_by || [],
         })),
         notes: [],
       });
@@ -245,7 +254,7 @@ export const StartupProvider = ({ children }) => {
   }, [user?.email]);
 
   // Synchronous State Commit
-  const loginUser = (email, password, name = 'Innovator', supabaseUserId = null) => {
+  const loginUser = (email, password, name = 'Innovator', supabaseUserId = null, role = 'Founder', userType = 'solo', orgMode = null) => {
     const prevSavedUser = localStorage.getItem('startup_user');
     const prevUser = prevSavedUser ? JSON.parse(prevSavedUser) : null;
 
@@ -253,7 +262,9 @@ export const StartupProvider = ({ children }) => {
       fullName:            name,
       email:               email,
       userId:              supabaseUserId || prevUser?.userId || null,
-      role:                'Founder',
+      role:                role,
+      userType:            userType,
+      orgMode:             orgMode,
       avatarUrl:           prevUser?.avatarUrl || '',
       isNewUser:           false,  // will be set by DB check in Login.jsx
       onboardingCompleted: false,  // will be set by DB check in Login.jsx
@@ -609,7 +620,13 @@ export const StartupProvider = ({ children }) => {
           return updated;
         });
       } else if (action === 'delete') {
+        const dbId = taskPayload.dbTaskId || node.tasks?.find(t => t.id === taskPayload.id)?.dbTaskId;
         updatedTasks = updatedTasks.filter(t => t.id !== taskPayload.id);
+        if (dbId) {
+          import('../services/startupApi').then(({ deleteTask }) => {
+            deleteTask(dbId).catch(err => console.warn('[RoadmapSync] task deletion failed:', err.message));
+          });
+        }
       } else if (action === 'updateField') {
         // Used for inline field edits (priority, assigned_to, etc.)
         updatedTasks = updatedTasks.map(t => {
@@ -618,8 +635,13 @@ export const StartupProvider = ({ children }) => {
           if (t.dbTaskId && taskPayload.fields) {
             // Map frontend field names to DB column names
             const dbFields = {};
+            if (taskPayload.fields.title       !== undefined) dbFields.title       = taskPayload.fields.title;
+            if (taskPayload.fields.description !== undefined) dbFields.description = taskPayload.fields.description;
+            if (taskPayload.fields.timeline    !== undefined) dbFields.timeline    = taskPayload.fields.timeline;
             if (taskPayload.fields.priority    !== undefined) dbFields.priority    = taskPayload.fields.priority;
             if (taskPayload.fields.assignedTo  !== undefined) dbFields.assigned_to = taskPayload.fields.assignedTo;
+            if (taskPayload.fields.assigned_member_id !== undefined) dbFields.assigned_member_id = taskPayload.fields.assigned_member_id;
+            if (taskPayload.fields.assignee_role !== undefined) dbFields.assignee_role = taskPayload.fields.assignee_role;
             if (taskPayload.fields.depStatus   !== undefined) dbFields.dep_status  = taskPayload.fields.depStatus;
             if (taskPayload.fields.complexity  !== undefined) dbFields.complexity  = taskPayload.fields.complexity;
             if (taskPayload.fields.costImpact  !== undefined) dbFields.cost_impact = taskPayload.fields.costImpact;
@@ -855,17 +877,19 @@ export const StartupProvider = ({ children }) => {
         status:          branch.status === 'success' ? 'In Progress' : 'Pending',
         priority:        'Medium',
         isExpanded:      true,
-        tasks: tasksToMap.map(t => ({
-          id:           t.task_id || `task-${Math.random().toString(36).slice(2)}`,
-          dbTaskId:     t.db_id   || null,         // DB uuid from roadmap_tasks
+        tasks: tasksToMap.map((t, idx) => ({
+          id:           t.task_id || `task-${idx}-${Math.random().toString(36).slice(2)}`,
+          dbTaskId:     t.db_id || t.id || null,         // DB uuid from roadmap_tasks
+          title:        t.title || '',
           text:         `[${t.timeline || ''}] ${t.title}`.trim(),
-          completed:    false,
+          completed:    t.status === 'Done' || t.dep_status === 'Done' || t.completed === true,
           priority:     t.priority     || 'Medium',
           assignedTo:   t.assigned_to  || 'Unassigned',
           assigneeRole: t.assignee_role || '',
+          assignedMemberId: t.assigned_member_id || null,
           complexity:   t.complexity   || 'Low',
           costImpact:   t.cost_impact  || 'None',
-          depStatus:    t.status       || 'Ready',
+          depStatus:    t.status || t.dep_status || 'Ready',
           description:  t.description  || '',
           timeline:     t.timeline     || '',
           blockedBy:    t.blocked_by   || [],

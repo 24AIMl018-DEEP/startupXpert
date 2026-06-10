@@ -42,18 +42,38 @@ const Login = () => {
       const data = await signInUser(form.email, form.password);
       const uid  = data.user?.id || null;
       const name = data.user?.user_metadata?.full_name || form.email.split('@')[0].replace(/^./, c => c.toUpperCase());
-      loginUser(form.email, form.password, name, uid);
       if (uid) {
-        // Check if org member → route to member dashboard
+        // Check if org member → route to member dashboard or dashboard
         const { getMyOrganization } = await import('../services/startupApi');
         const orgData = await getMyOrganization(uid).catch(() => null);
-        if (orgData && orgData.myRole === 'member') {
-          navigate('/member', { replace: true });
-          return;
+        
+        let userRole = 'Founder';
+        let userType = 'solo';
+        let orgMode = null;
+        
+        if (orgData) {
+          userType = 'org';
+          if (orgData.myRole === 'member' || orgData.myRole === 'Member') {
+            userRole = 'Member';
+            orgMode = 'join';
+          } else {
+            userRole = 'Founder';
+            orgMode = 'create';
+          }
         }
-        const { hasValidation } = await checkUserHasValidation(uid);
-        navigate(hasValidation ? '/dashboard' : '/onboarding/role', { replace: true });
-      } else navigate('/onboarding/role');
+
+        loginUser(form.email, form.password, name, uid, userRole, userType, orgMode);
+
+        if (userType === 'org' && userRole === 'Member') {
+          navigate('/member', { replace: true });
+        } else {
+          const { hasValidation } = await checkUserHasValidation(uid);
+          navigate(hasValidation ? '/dashboard' : '/onboarding/role', { replace: true });
+        }
+      } else {
+        loginUser(form.email, form.password, name, null);
+        navigate('/onboarding/role');
+      }
     } catch (err) { setSubmitErr(err.message || 'Invalid credentials.'); }
     finally { setLoading(false); setLoadingL(false); }
   };

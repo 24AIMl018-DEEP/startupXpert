@@ -23,3 +23,6 @@ class Config:
     DEEPSEEK_API_KEY          = os.getenv("DEEPSEEK_API_KEY")       # platform.deepseek.com
     OPENROUTER_API_KEY        = os.getenv("OPENROUTER_API_KEY")     # openrouter.ai  (free models)
     CEREBRAS_API_KEY          = os.getenv("CEREBRAS_API_KEY")       # cloud.cerebras.ai (free tier)
+    TOGETHER_API_KEY          = os.getenv("TOGETHER_API_KEY")       # api.together.xyz
+    GEMINI_API_KEY            = os.getenv("GEMINI_API_KEY")         # gemini via openai compat
+

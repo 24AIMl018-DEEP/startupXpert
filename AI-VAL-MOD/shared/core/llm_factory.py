@@ -157,10 +157,30 @@ _PROVIDERS = {
             model="deepseek/deepseek-chat-v3-0324:free",
         )),
     },
+    7: {
+        "name": "Together AI",
+        "available": lambda: bool(Config.TOGETHER_API_KEY),
+        "call": lambda p, t: _run_async(_openai_compat(
+            p, t,
+            api_key=Config.TOGETHER_API_KEY,
+            base_url="https://api.together.xyz/v1",
+            model="meta-llama/Llama-3.3-70b-instruct-turbo",
+        )),
+    },
+    8: {
+        "name": "Google Gemini",
+        "available": lambda: bool(Config.GEMINI_API_KEY),
+        "call": lambda p, t: _run_async(_openai_compat(
+            p, t,
+            api_key=Config.GEMINI_API_KEY,
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            model="gemini-1.5-flash",
+        )),
+    },
 }
 
 # Default fallback chain — most reliable free providers first, Ollama last
-_DEFAULT_CHAIN = [2, 4, 5, 6, 3, 1]  # Groq → DeepSeek → Cerebras → OpenRouter → NVIDIA → Ollama
+_DEFAULT_CHAIN = [2, 5, 6, 3, 4, 8, 7, 1]  # Groq → Cerebras → OpenRouter → NVIDIA → DeepSeek → Gemini → Together → Ollama
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

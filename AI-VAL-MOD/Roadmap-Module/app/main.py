@@ -122,18 +122,19 @@ class BranchUpdateRequest(BaseModel):
 
 
 class TaskUpdateRequest(BaseModel):
-    dep_status:      Optional[str]      = None
-    priority:        Optional[str]      = None
-    assigned_to:     Optional[str]      = None
-    assignee_role:   Optional[str]      = None
-    title:           Optional[str]      = None
-    description:     Optional[str]      = None
-    timeline:        Optional[str]      = None
-    estimated_hours: Optional[int]      = None
-    complexity:      Optional[str]      = None
-    cost_impact:     Optional[str]      = None
-    blocked_by:      Optional[List[str]] = None
-    unblocks:        Optional[List[str]] = None
+    dep_status:          Optional[str]      = None
+    priority:            Optional[str]      = None
+    assigned_to:         Optional[str]      = None
+    assignee_role:       Optional[str]      = None
+    assigned_member_id:  Optional[str]      = None
+    title:               Optional[str]      = None
+    description:         Optional[str]      = None
+    timeline:            Optional[str]      = None
+    estimated_hours:     Optional[int]      = None
+    complexity:          Optional[str]      = None
+    cost_impact:         Optional[str]      = None
+    blocked_by:          Optional[List[str]] = None
+    unblocks:            Optional[List[str]] = None
 
 
 @app.get("/health")

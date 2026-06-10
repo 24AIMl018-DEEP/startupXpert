@@ -643,3 +643,12 @@ export async function assignTaskToMember(taskId, memberId, memberName, memberRol
     .eq('id', taskId);
   if (error) throw error;
 }
+
+// Delete task from DB
+export async function deleteTask(taskId) {
+  const { error } = await supabase
+    .from('roadmap_tasks')
+    .delete()
+    .eq('id', taskId);
+  if (error) throw error;
+}

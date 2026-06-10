@@ -25,6 +25,16 @@ const ProtectedRoute = ({
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // Gate 1.5 — Member role restriction
+  const isMember = user?.userType === 'org' && (user?.role === 'Member' || user?.role === 'member');
+  if (isMember) {
+    const allowedMemberPaths = ['/member', '/profile', '/settings'];
+    const isAllowed = allowedMemberPaths.some(p => location.pathname.startsWith(p));
+    if (!isAllowed) {
+      return <Navigate to="/member" replace />;
+    }
+  }
+
   // Paths that are part of the onboarding flow — don't redirect away from these
   const onboardingPaths = [
     '/onboarding/role',

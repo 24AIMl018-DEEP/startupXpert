@@ -125,7 +125,7 @@ def update_task(task_id: str, fields: Dict) -> Optional[Dict]:
     """Patch allowed fields on a roadmap_tasks row."""
     allowed = {
         "title", "description", "timeline", "priority",
-        "assigned_to", "assignee_role", "estimated_hours",
+        "assigned_to", "assignee_role", "assigned_member_id", "estimated_hours",
         "complexity", "cost_impact", "dep_status", "blocked_by", "unblocks"
     }
     patch = {k: v for k, v in fields.items() if k in allowed}
