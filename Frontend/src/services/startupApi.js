@@ -572,11 +572,11 @@ export async function getMyOrganization(userId) {
 
   const { data: members } = await supabase
     .from('org_members')
-    .select('id, user_id, role, full_name, job_title, skills, joined_at')
+    .select('id, user_id, role, full_name, job_title, skills, joined_at, email')
     .eq('org_id', membership.org_id)
     .order('joined_at', { ascending: true });
 
-  return { org, myRole: membership.role, members: (members || []).map(m => ({ ...m, email: '' })) };
+  return { org, myRole: membership.role, members: members || [] };
 }
 
 // Add or invite member to organization using the backend API
