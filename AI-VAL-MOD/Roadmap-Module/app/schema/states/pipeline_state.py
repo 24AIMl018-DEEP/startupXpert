@@ -11,6 +11,7 @@ class ProfilerOutput(BaseModel):
 
 
 class TeamMember(BaseModel):
+    id: Optional[str] = None
     name: str
     role: str                    # e.g. "Co-Founder", "Developer", "Marketing Lead"
     skills: List[str]            # e.g. ["Python", "ML"] or ["Sales", "Negotiation"]
@@ -34,6 +35,7 @@ class EnrichedTask(BaseModel):
     # Module 3 fields
     assigned_to: Optional[str] = None       # team member name
     assignee_role: Optional[str] = None     # their role
+    assigned_member_id: Optional[str] = None # UUID from database
     estimated_hours: Optional[int] = None
     complexity: Optional[str] = None
     cost_impact: Optional[str] = None
@@ -48,6 +50,7 @@ class SyncedTask(BaseModel):
     priority:        Optional[str] = None
     assigned_to:     Optional[str] = None
     assignee_role:   Optional[str] = None
+    assigned_member_id: Optional[str] = None # UUID from database
     estimated_hours: Optional[int] = None
     complexity:      Optional[str] = None
     cost_impact:     Optional[str] = None

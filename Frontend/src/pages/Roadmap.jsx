@@ -23,15 +23,27 @@ const priorityColor = (p) =>
   p === 'High' ? 'var(--red)' : p === 'Medium' ? 'var(--amber)' : 'var(--text3)';
 
 // ── Connector line ─────────────────────────────────────────────────────────────
-const Line = ({ vertical, length = 32, dashed }) => (
+const Line = ({ vertical, length = 32, dashed, active }) => (
   <div style={{
     [vertical ? 'height' : 'width']: length,
     [vertical ? 'width' : 'height']: 2,
     flexShrink: 0,
-    background: dashed ? 'none' : 'var(--border2)',
-    borderTop: !vertical && dashed ? '2px dashed var(--border2)' : undefined,
-    borderLeft: vertical && dashed ? '2px dashed var(--border2)' : undefined,
-    opacity: 0.8,
+    background: dashed 
+      ? 'none' 
+      : active 
+      ? 'linear-gradient(90deg, var(--brand), var(--brand-light))' 
+      : 'var(--border2)',
+    borderTop: !vertical && dashed 
+      ? `2px dashed ${active ? 'var(--brand)' : 'var(--border2)'}` 
+      : undefined,
+    borderLeft: vertical && dashed 
+      ? `2px dashed ${active ? 'var(--brand)' : 'var(--border2)'}` 
+      : undefined,
+    boxShadow: active 
+      ? '0 0 8px var(--brand)' 
+      : 'none',
+    opacity: active ? 1 : 0.8,
+    transition: 'all 0.3s ease',
   }} />
 );
 
@@ -431,14 +443,44 @@ const NodeDrawer = ({ node, onClose }) => {
 };
 
 // ── Org Members Panel ─────────────────────────────────────────────────────────
-const MembersPanel = ({ members, allTasks }) => {
+const MembersPanel = ({ members, allTasks, orgName, orgInviteCode }) => {
+  const [copied, setCopied] = useState(false);
   if (!members.length) return null;
+
+  const handleCopy = () => {
+    if (orgInviteCode) {
+      navigator.clipboard.writeText(orgInviteCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: 14, padding: '16px 20px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <Users size={14} style={{ color: 'var(--brand-light)' }} />
-        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text1)' }}>Team</div>
-        <span style={{ fontSize: 10, color: 'var(--text3)', marginLeft: 'auto' }}>{members.length} members</span>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: 14, padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, borderBottom: '1px solid var(--border)', paddingBottom: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <Users size={14} style={{ color: 'var(--brand-light)' }} />
+          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text1)' }}>
+            {orgName ? `${orgName} Team` : 'Team'}
+          </div>
+          <span style={{ fontSize: 10, color: 'var(--text3)' }}>({members.length} members)</span>
+        </div>
+        {orgInviteCode && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, background: 'var(--surface2)', padding: '4px 8px', borderRadius: 6, border: '1px solid var(--border2)' }}>
+            <span style={{ color: 'var(--text3)' }}>Invite Code:</span>
+            <span style={{ color: 'var(--brand-light)', fontWeight: 700, fontFamily: 'monospace' }}>{orgInviteCode}</span>
+            <button 
+              onClick={handleCopy}
+              style={{
+                background: 'none', border: 'none', color: copied ? 'var(--green)' : 'var(--text2)',
+                fontSize: 10, cursor: 'pointer', fontWeight: 600, padding: '2px 6px',
+                borderRadius: 4, background: 'var(--surface3)', display: 'inline-flex', alignItems: 'center'
+              }}
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+        )}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {members.map((m, i) => {
@@ -497,10 +539,17 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
   const phases = Object.values(phaseMap);
 
   return (
-    <div style={{ background: 'var(--bg-sub)', borderRadius: 16, border: '1px solid var(--border2)', overflow: 'hidden' }}>
+    <div style={{ 
+      background: 'radial-gradient(circle at 20% 20%, rgba(20,20,35,0.9) 0%, rgba(10,10,16,0.99) 100%), radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px) 20px 20px', 
+      backgroundSize: 'auto, 20px 20px',
+      borderRadius: 16, 
+      border: '1px solid var(--border2)', 
+      overflow: 'hidden',
+      position: 'relative'
+    }}>
 
       {/* Level 1 — Root → Branches */}
-      <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', overflowX: 'auto' }}>
+      <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', overflowX: 'auto', position: 'relative', zIndex: 2 }}>
         <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)', marginBottom: 16 }}>
           Roadmap Pipeline
         </div>
@@ -510,7 +559,7 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
             domain={roadmapData?.profiler_output?.business_type}
             onClick={() => onNodeClick({ type: 'root', title: startupName, description: roadmapData?.profiler_output?.reasoning })}
           />
-          <Line length={32} />
+          <Line length={32} active={activeBranch !== null} />
 
           {/* Branches stacked vertically */}
           <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -523,7 +572,13 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
                   {/* T-junction connector */}
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 20, alignSelf: 'stretch' }}>
                     <div style={{ width: 2, flex: isFirst ? '0 0 50%' : 1, background: isFirst ? 'transparent' : 'var(--border2)' }} />
-                    <div style={{ width: 14, height: 2, background: 'var(--border2)' }} />
+                    <div style={{ 
+                      width: 14, 
+                      height: 2, 
+                      background: active ? 'linear-gradient(90deg, var(--brand), var(--brand-light))' : 'var(--border2)',
+                      boxShadow: active ? '0 0 8px var(--brand)' : 'none',
+                      transition: 'all 0.3s ease'
+                    }} />
                     <div style={{ width: 2, flex: isLast ? '0 0 50%' : 1, background: isLast ? 'transparent' : 'var(--border2)' }} />
                   </div>
 
@@ -538,7 +593,7 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
                     />
                     {active && (
                       <>
-                        <Line length={16} dashed />
+                        <Line length={16} dashed active />
                         <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand)', boxShadow: '0 0 8px var(--brand)' }} />
                       </>
                     )}
@@ -552,7 +607,7 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
 
       {/* Level 2 — Phases (when branch selected) */}
       {activeBranch !== null && phases.length > 0 && (
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', overflowX: 'auto', background: 'var(--surface)' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', overflowX: 'auto', background: 'rgba(10, 10, 16, 0.4)', backdropFilter: 'blur(2px)', position: 'relative', zIndex: 2 }}>
           <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)', marginBottom: 14 }}>
             {branches[activeBranch]?.branch?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — Phases
           </div>
@@ -570,7 +625,7 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
                     {phase.tasks.map((task, tIdx) => (
                       <React.Fragment key={tIdx}>
-                        <Line vertical length={10} />
+                        <Line vertical length={10} active />
                         {task.milestone
                           ? <MilestoneDiamond title={task.title} onClick={() => onNodeClick({ ...task, type: 'milestone' })} />
                           : <TaskNode
@@ -586,9 +641,9 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
                 </div>
                 {pIdx < phases.length - 1 && (
                   <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 36 }}>
-                    <Line length={32} />
-                    <ChevronRight size={12} style={{ color: 'var(--text3)', flexShrink: 0 }} />
-                    <Line length={8} />
+                    <Line length={32} active />
+                    <ChevronRight size={12} style={{ color: 'var(--brand-light)', filter: 'drop-shadow(0 0 4px var(--brand))', flexShrink: 0 }} />
+                    <Line length={8} active />
                   </div>
                 )}
               </React.Fragment>
@@ -598,7 +653,7 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
       )}
 
       {activeBranch === null && branches.length > 0 && (
-        <div style={{ padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text3)', fontSize: 12 }}>
+        <div style={{ padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text3)', fontSize: 12, position: 'relative', zIndex: 2 }}>
           <ChevronRight size={14} /> Click any branch to expand phases and tasks
         </div>
       )}
@@ -607,8 +662,17 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
 };
 
 // ── Team Setup Modal ──────────────────────────────────────────────────────────
-const TeamModal = ({ onConfirm, onCancel, isGenerating }) => {
-  const [members, setMembers] = useState([{ name: '', role: '', skills: '' }]);
+const TeamModal = ({ onConfirm, onCancel, isGenerating, initialMembers = [] }) => {
+  const [members, setMembers] = useState(() => {
+    if (initialMembers && initialMembers.length > 0) {
+      return initialMembers.map(m => ({
+        name: m.name || '',
+        role: m.role || '',
+        skills: Array.isArray(m.skills) ? m.skills.join(', ') : (m.skills || ''),
+      }));
+    }
+    return [{ name: '', role: '', skills: '' }];
+  });
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)', padding: 16 }}>
       <div style={{ width: '100%', maxWidth: 440, background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow-lg)' }} className="animate-scale-in">
@@ -671,6 +735,8 @@ const Roadmap = () => {
   const [fullscreen,    setFullscreen]      = useState(false);
   const [editingTask,   setEditingTask]     = useState(null);
   const [teamMembers,   setTeamMembers]     = useState([]); // persisted across generate calls
+  const [orgInviteCode, setOrgInviteCode]   = useState(null);
+  const [orgName, setOrgName]               = useState(null);
 
   useEffect(() => {
     if (user?.userId) {
@@ -678,14 +744,20 @@ const Roadmap = () => {
         try {
           const { getMyOrganization } = await import('../services/startupApi');
           const orgData = await getMyOrganization(user.userId);
-          if (orgData && orgData.members) {
-            const mapped = orgData.members.map(m => ({
-              id: m.id,
-              name: m.full_name,
-              role: m.job_title || m.role,
-              skills: Array.isArray(m.skills) ? m.skills : [],
-            }));
-            setTeamMembers(mapped);
+          if (orgData) {
+            if (orgData.org) {
+              setOrgInviteCode(orgData.org.invite_code);
+              setOrgName(orgData.org.name);
+            }
+            if (orgData.members) {
+              const mapped = orgData.members.map(m => ({
+                id: m.id,
+                name: m.full_name,
+                role: m.job_title || m.role,
+                skills: Array.isArray(m.skills) ? m.skills : [],
+              }));
+              setTeamMembers(mapped);
+            }
           }
         } catch (err) {
           console.warn('Failed to load team members:', err);
@@ -824,14 +896,26 @@ const Roadmap = () => {
 
       {/* Team members */}
       {teamMembers.length > 0 && displayData && (
-        <MembersPanel members={teamMembers} allTasks={allTasks} />
+        <MembersPanel 
+          members={teamMembers} 
+          allTasks={allTasks} 
+          orgName={orgName} 
+          orgInviteCode={orgInviteCode} 
+        />
       )}
     </>
   );
 
   return (
     <DashboardLayout activeTab="roadmap">
-      {showTeamModal && <TeamModal onConfirm={handleGenerate} onCancel={() => setShowTeamModal(false)} isGenerating={isGeneratingRoadmap} />}
+      {showTeamModal && (
+        <TeamModal 
+          onConfirm={handleGenerate} 
+          onCancel={() => setShowTeamModal(false)} 
+          isGenerating={isGeneratingRoadmap} 
+          initialMembers={teamMembers}
+        />
+      )}
 
       {editingTask && (
         <TaskEditModal

@@ -68,6 +68,24 @@ async def run_roadmap_pipeline(
         "profiler_output": profiler_output,
     })
 
+    # Map team member name (case-insensitive) to their org_members UUID
+    member_id_map = {}
+    for m in team_members:
+        if m.get("name") and m.get("id"):
+            member_id_map[m["name"].lower().strip()] = m["id"]
+
+    # Map task assignments to member database IDs
+    for r in final_state.get("branch_results", []):
+        for t in r.get("tasks", []):
+            assigned_name = t.get("assigned_to")
+            if assigned_name:
+                t["assigned_member_id"] = member_id_map.get(assigned_name.lower().strip())
+
+    for t in final_state.get("synced_tasks", []):
+        assigned_name = t.get("assigned_to")
+        if assigned_name:
+            t["assigned_member_id"] = member_id_map.get(assigned_name.lower().strip())
+
     # ── Assemble output + write to DB ──────────────────────────────
     approved_set     = set(approved_branches)
     branch_roadmaps: List[BranchRoadmap] = []
@@ -125,6 +143,7 @@ async def run_roadmap_pipeline(
             priority=        t.get("priority"),
             assigned_to=     t.get("assigned_to"),
             assignee_role=   t.get("assignee_role"),
+            assigned_member_id= t.get("assigned_member_id"),
             estimated_hours= t.get("estimated_hours"),
             complexity=      t.get("complexity"),
             cost_impact=     t.get("cost_impact"),

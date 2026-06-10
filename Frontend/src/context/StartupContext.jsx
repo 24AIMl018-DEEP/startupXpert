@@ -781,9 +781,35 @@ export const StartupProvider = ({ children }) => {
         return null;
       }
 
+      // Map names to member IDs
+      let enrichedTeam = [...team];
+      if (user?.userId) {
+        try {
+          const { getMyOrganization } = await import('../services/startupApi');
+          const orgData = await getMyOrganization(user.userId);
+          if (orgData && orgData.members) {
+            const memberMap = {};
+            orgData.members.forEach(m => {
+              if (m.full_name) {
+                memberMap[m.full_name.toLowerCase().trim()] = m.id;
+              }
+            });
+            enrichedTeam = team.map(m => {
+              const nameKey = m.name ? m.name.toLowerCase().trim() : '';
+              return {
+                ...m,
+                id: memberMap[nameKey] || m.id || null
+              };
+            });
+          }
+        } catch (e) {
+          console.warn('[Roadmap] org member mapping failed:', e.message);
+        }
+      }
+
       let result = null;
       try {
-        result = await submitRoadmap(sessionId, team);
+        result = await submitRoadmap(sessionId, enrichedTeam);
       } catch (apiErr) {
         const isTimeout = apiErr.message === 'ROADMAP_TIMEOUT';
         if (isTimeout) {

@@ -95,6 +95,7 @@ def write_tasks(branch_id: str, tasks: List[Dict]) -> List[Dict]:
             "priority":        task.get("priority"),
             "assigned_to":     task.get("assigned_to"),
             "assignee_role":   task.get("assignee_role"),
+            "assigned_member_id": task.get("assigned_member_id"),
             "estimated_hours": task.get("estimated_hours"),
             "complexity":      task.get("complexity"),
             "cost_impact":     task.get("cost_impact"),
