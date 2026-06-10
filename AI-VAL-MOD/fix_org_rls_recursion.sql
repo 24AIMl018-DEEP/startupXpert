@@ -49,12 +49,9 @@ AS $$
   );
 $$;
 
--- Step 3: Re-create organizations policies (use the SECURITY DEFINER function)
+-- Step 3: Re-create organizations policies (anyone can read organizations to validate invite codes during sign up)
 CREATE POLICY "org_read" ON organizations FOR SELECT
-  USING (
-    created_by = auth.uid()
-    OR is_org_member(id, auth.uid())
-  );
+  USING (true);
 
 CREATE POLICY "org_insert" ON organizations FOR INSERT
   WITH CHECK (auth.uid() = created_by);

@@ -542,6 +542,17 @@ export async function createOrganization(name, domain, userId) {
 // Get org + members for the logged-in user
 export async function getMyOrganization(userId) {
   if (!userId) return null;
+
+  try {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${ROADMAP_URL}/api/v1/organizations/my-org/${userId}`, { headers });
+    if (res.ok) {
+      return await res.json();
+    }
+  } catch (err) {
+    console.warn('[Roadmap API] getMyOrganization backend error, falling back to direct Supabase query:', err);
+  }
+
   const { data: membership } = await supabase
     .from('org_members')
     .select('org_id, role, full_name, job_title, skills')
@@ -563,7 +574,28 @@ export async function getMyOrganization(userId) {
     .eq('org_id', membership.org_id)
     .order('joined_at', { ascending: true });
 
-  return { org, myRole: membership.role, members: members || [] };
+  return { org, myRole: membership.role, members: (members || []).map(m => ({ ...m, email: '' })) };
+}
+
+// Add or invite member to organization using the backend API
+export async function addOrganizationMember(orgId, email, fullName, role, skills) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${ROADMAP_URL}/api/v1/organizations/members`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      org_id: orgId,
+      email,
+      full_name: fullName,
+      role,
+      skills: Array.isArray(skills) ? skills : skills.split(',').map(s => s.trim()).filter(Boolean),
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `Failed to add member: ${res.status}`);
+  }
+  return res.json();
 }
 
 // Join org via invite code

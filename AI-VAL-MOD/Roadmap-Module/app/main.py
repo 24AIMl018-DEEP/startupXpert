@@ -245,3 +245,188 @@ def patch_task(task_id: str, payload: TaskUpdateRequest):
         raise HTTPException(status_code=404, detail="Task not found or update failed.")
     return {"status": "updated", "task": updated}
 
+
+class AddMemberRequest(BaseModel):
+    org_id: str
+    email: str
+    full_name: str
+    role: str
+    skills: List[str] = []
+
+
+@app.post("/api/v1/organizations/members")
+def add_org_member(payload: AddMemberRequest):
+    """Invite or add a member to the organization."""
+    from shared.db.supabase_client import get_supabase
+    supabase = get_supabase()
+
+    email_clean = payload.email.strip().lower()
+
+    # 1. Search auth.users for this email
+    try:
+        users_res = supabase.auth.admin.list_users()
+        target_user = None
+        for u in users_res:
+            if u.email and u.email.strip().lower() == email_clean:
+                target_user = u
+                break
+    except Exception as e:
+        logger.error(f"Error checking auth users: {e}")
+        raise HTTPException(status_code=500, detail="Failed to search auth users.")
+
+    user_id = None
+    if target_user:
+        user_id = target_user.id
+        logger.info(f"User {email_clean} exists with ID {user_id}")
+    else:
+        # Create user
+        import secrets
+        temp_pwd = secrets.token_urlsafe(12)
+        try:
+            new_user = supabase.auth.admin.create_user({
+                "email": email_clean,
+                "password": temp_pwd,
+                "email_confirm": True,
+                "user_metadata": { "full_name": payload.full_name }
+            })
+            user_id = new_user.user.id
+            logger.info(f"Created new user {email_clean} with ID {user_id}")
+        except Exception as e:
+            logger.error(f"Failed to create new user: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to create user account: {e}")
+
+    # 2. Check if already in org_members
+    try:
+        existing = supabase.table("org_members")\
+            .select("id")\
+            .eq("org_id", payload.org_id)\
+            .eq("user_id", user_id)\
+            .execute()
+        if existing.data:
+            # Already a member, update role/skills
+            supabase.table("org_members")\
+                .update({
+                    "full_name": payload.full_name,
+                    "job_title": payload.role,
+                    "skills": payload.skills
+                })\
+                .eq("id", existing.data[0]["id"])\
+                .execute()
+            return {"status": "updated", "member_id": existing.data[0]["id"]}
+    except Exception as e:
+        logger.error(f"Error checking/updating member: {e}")
+
+    # 3. Insert into org_members
+    try:
+        res = supabase.table("org_members").insert({
+            "org_id": payload.org_id,
+            "user_id": user_id,
+            "role": "member",
+            "full_name": payload.full_name,
+            "job_title": payload.role,
+            "skills": payload.skills
+        }).execute()
+        if res.data:
+            return {"status": "added", "member": res.data[0]}
+        raise Exception("No data returned from insert")
+    except Exception as e:
+        logger.error(f"Failed to insert org member: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to add member to organization: {e}")
+
+
+@app.get("/api/v1/organizations/my-org/{user_id}")
+def get_my_organization_backend(user_id: str):
+    """Get organization and member list including emails, using the admin client."""
+    from shared.db.supabase_client import get_supabase
+    supabase = get_supabase()
+
+    try:
+        # 1. Fetch user membership
+        membership = supabase.table("org_members")\
+            .select("org_id, role, full_name, job_title, skills")\
+            .eq("user_id", user_id)\
+            .order("joined_at", { "ascending": True })\
+            .limit(1)\
+            .maybeSingle()\
+            .execute()
+        
+        if not membership or not membership.data:
+            return {"org": None, "myRole": None, "members": []}
+        
+        m_data = membership.data
+        org_id = m_data["org_id"]
+        my_role = m_data["role"]
+
+        # 2. Fetch organization info
+        org = supabase.table("organizations")\
+            .select("id, name, domain, invite_code")\
+            .eq("id", org_id)\
+            .single()\
+            .execute()
+        
+        if not org or not org.data:
+            return {"org": None, "myRole": None, "members": []}
+
+        # 3. Fetch all members
+        members_res = supabase.table("org_members")\
+            .select("id, user_id, role, full_name, job_title, skills, joined_at")\
+            .eq("org_id", org_id)\
+            .order("joined_at", { "ascending": True })\
+            .execute()
+        
+        members = members_res.data or []
+
+        # 4. Fetch emails of all members using admin.list_users()
+        email_map = {}
+        try:
+            users_res = supabase.auth.admin.list_users()
+            for u in users_res:
+                if u.id:
+                    email_map[u.id] = u.email
+        except Exception as auth_err:
+            logger.error(f"Error fetching auth users for emails: {auth_err}")
+
+        # Fetch active task count for each member ID
+        member_ids = [m.get("id") for m in members]
+        task_counts = {}
+        if member_ids:
+            try:
+                tasks_res = supabase.table("roadmap_tasks")\
+                    .select("assigned_member_id")\
+                    .in_("assigned_member_id", member_ids)\
+                    .execute()
+                for t in (tasks_res.data or []):
+                    mid = t.get("assigned_member_id")
+                    if mid:
+                        task_counts[mid] = task_counts.get(mid, 0) + 1
+            except Exception as task_err:
+                logger.error(f"Error querying task counts: {task_err}")
+
+        # 5. Enrich members list with email and task_count
+        enriched_members = []
+        for m in members:
+            uid = m.get("user_id")
+            email = email_map.get(uid) or ""
+            mid = m.get("id")
+            enriched_members.append({
+                "id": mid,
+                "user_id": uid,
+                "role": m.get("role"),
+                "full_name": m.get("full_name"),
+                "job_title": m.get("job_title"),
+                "skills": m.get("skills") or [],
+                "joined_at": m.get("joined_at"),
+                "email": email,
+                "task_count": task_counts.get(mid, 0)
+            })
+
+        return {
+            "org": org.data,
+            "myRole": my_role,
+            "members": enriched_members
+        }
+
+    except Exception as e:
+        logger.error(f"Error in get_my_organization_backend: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
