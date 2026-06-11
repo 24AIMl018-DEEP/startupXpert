@@ -1,4 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import ReactFlow, { Background, Controls, Handle } from 'reactflow';
+import 'reactflow/dist/style.css';
 import { useStartup } from '../context/StartupContext';
 import { useToast } from '../context/ToastContext';
 import DashboardLayout from '../layouts/DashboardLayout';
@@ -530,148 +532,178 @@ const MembersPanel = ({ members, allTasks, orgName, orgInviteCode }) => {
   );
 };
 
-// ── Railway Canvas ────────────────────────────────────────────────────────────
+// ── ReactFlow Canvas ────────────────────────────────────────────────────────────
+const nodeTypes = {
+  root: ({ data }) => (
+    <>
+      <RootNode title={data.title} domain={data.domain} onClick={data.onClick} />
+      <Handle type="source" position="right" style={{ background: 'transparent', border: 'none' }} />
+    </>
+  ),
+  branch: ({ data }) => (
+    <>
+      <Handle type="target" position="left" style={{ background: 'transparent', border: 'none' }} />
+      <BranchNode branch={data.branch} active={data.active} onClick={data.onClick} />
+      <Handle type="source" position="right" style={{ background: 'transparent', border: 'none' }} />
+    </>
+  ),
+  phase: ({ data }) => (
+    <>
+      <Handle type="target" position="left" style={{ background: 'transparent', border: 'none' }} />
+      <PhaseNode name={data.name} goal={data.goal} taskCount={data.taskCount} onClick={data.onClick} />
+      <Handle type="source" position="right" style={{ background: 'transparent', border: 'none' }} />
+    </>
+  ),
+  task: ({ data }) => (
+    <>
+      <Handle type="target" position="top" style={{ background: 'transparent', border: 'none' }} />
+      {data.task.milestone ? (
+        <MilestoneDiamond title={data.task.title} onClick={data.onClick} />
+      ) : (
+        <TaskNode task={data.task} isFounder={data.isFounder} onClick={data.onClick} onEdit={data.onEdit} />
+      )}
+    </>
+  )
+};
+
 const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeClick, onTaskEdit }) => {
   const [activeBranch, setActiveBranch] = useState(null);
 
   const branches = roadmapData?.branch_roadmaps || roadmapData?.branches || [];
   const synced   = roadmapData?.synced_tasks || [];
 
-  const displayBranch = activeBranch !== null ? branches[activeBranch] : null;
-  const branchTasks   = displayBranch
-    ? (synced.filter(t => t.branch === displayBranch.branch).length > 0
-        ? synced.filter(t => t.branch === displayBranch.branch)
-        : (displayBranch.tasks || []))
-    : [];
+  const { nodes, edges } = useMemo(() => {
+    const nds = [];
+    const eds = [];
+    
+    // Root
+    nds.push({
+      id: 'root',
+      type: 'root',
+      position: { x: 50, y: Math.max(branches.length * 100, 300) },
+      data: {
+        title: startupName || roadmapData?.startup_name || 'Startup',
+        domain: roadmapData?.profiler_output?.business_type,
+        onClick: () => onNodeClick({ type: 'root', title: startupName, description: roadmapData?.profiler_output?.reasoning })
+      }
+    });
 
-  // Group tasks by phase
-  const phaseMap = {};
-  branchTasks.forEach(t => {
-    const ph = t.phase || 'Main';
-    if (!phaseMap[ph]) phaseMap[ph] = { name: ph, goal: t.phase_goal || '', tasks: [] };
-    phaseMap[ph].tasks.push(t);
-  });
-  const phases = Object.values(phaseMap);
+    let currentY = 50;
+    branches.forEach((branch, bIdx) => {
+      const isActive = activeBranch === bIdx;
+      const branchId = `branch-${bIdx}`;
+      
+      nds.push({
+        id: branchId,
+        type: 'branch',
+        position: { x: 350, y: currentY },
+        data: {
+          branch,
+          active: isActive,
+          onClick: () => {
+            setActiveBranch(isActive ? null : bIdx);
+            onNodeClick({ ...branch, type: 'branch', title: branch.branch });
+          }
+        }
+      });
+
+      eds.push({
+        id: `e-root-${branchId}`,
+        source: 'root',
+        target: branchId,
+        type: 'smoothstep',
+        animated: isActive,
+        style: { stroke: isActive ? 'var(--brand)' : 'var(--border2)', strokeWidth: 2 }
+      });
+
+      if (isActive) {
+        const branchTasks = synced.filter(t => t.branch === branch.branch).length > 0
+          ? synced.filter(t => t.branch === branch.branch)
+          : (branch.tasks || []);
+
+        const phaseMap = {};
+        branchTasks.forEach(t => {
+          const ph = t.phase || 'Main';
+          if (!phaseMap[ph]) phaseMap[ph] = { name: ph, goal: t.phase_goal || '', tasks: [] };
+          phaseMap[ph].tasks.push(t);
+        });
+        const phases = Object.values(phaseMap);
+
+        let phaseX = 650;
+        let branchBottomY = currentY;
+
+        phases.forEach((phase, pIdx) => {
+          const phaseId = `phase-${bIdx}-${pIdx}`;
+          nds.push({
+            id: phaseId,
+            type: 'phase',
+            position: { x: phaseX, y: currentY },
+            data: {
+              name: phase.name,
+              goal: phase.goal,
+              taskCount: phase.tasks.length,
+              onClick: () => onNodeClick({ type: 'phase', title: phase.name, description: phase.goal })
+            }
+          });
+
+          eds.push({
+            id: `e-${pIdx === 0 ? branchId : `phase-${bIdx}-${pIdx-1}`}-${phaseId}`,
+            source: pIdx === 0 ? branchId : `phase-${bIdx}-${pIdx-1}`,
+            target: phaseId,
+            type: 'smoothstep',
+            animated: true,
+            style: { stroke: 'var(--brand)', strokeWidth: 2 }
+          });
+
+          let taskY = currentY + 120;
+          phase.tasks.forEach((task, tIdx) => {
+            const taskId = `task-${task.id || tIdx}`;
+            nds.push({
+              id: taskId,
+              type: 'task',
+              position: { x: phaseX, y: taskY },
+              data: {
+                task,
+                isFounder,
+                onClick: () => onNodeClick({ ...task, type: task.milestone ? 'milestone' : 'task' }),
+                onEdit: () => onTaskEdit(task)
+              }
+            });
+
+            eds.push({
+              id: `e-${phaseId}-${taskId}`,
+              source: phaseId,
+              target: taskId,
+              type: 'smoothstep',
+              style: { stroke: 'var(--border2)', strokeWidth: 1 }
+            });
+            taskY += 120;
+          });
+
+          branchBottomY = Math.max(branchBottomY, taskY);
+          phaseX += 280;
+        });
+        currentY = Math.max(currentY, branchBottomY) + 40;
+      } else {
+        currentY += 140;
+      }
+    });
+
+    return { nodes: nds, edges: eds };
+  }, [roadmapData, startupName, activeBranch, isFounder, onNodeClick, onTaskEdit, branches, synced]);
 
   return (
-    <div style={{ 
-      background: 'radial-gradient(circle at 20% 20%, rgba(20,20,35,0.9) 0%, rgba(10,10,16,0.99) 100%), radial-gradient(rgba(255,255,255,0.02) 1px, transparent 1px) 20px 20px', 
-      backgroundSize: 'auto, 20px 20px',
-      borderRadius: 16, 
-      border: '1px solid var(--border2)', 
-      overflow: 'hidden',
-      position: 'relative'
-    }}>
-
-      {/* Level 1 — Root → Branches */}
-      <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', overflowX: 'auto', position: 'relative', zIndex: 2 }}>
-        <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)', marginBottom: 16 }}>
-          Roadmap Pipeline
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', minWidth: 'max-content' }}>
-          <RootNode
-            title={startupName || roadmapData?.startup_name || 'Startup'}
-            domain={roadmapData?.profiler_output?.business_type}
-            onClick={() => onNodeClick({ type: 'root', title: startupName, description: roadmapData?.profiler_output?.reasoning })}
-          />
-          <Line length={32} active={activeBranch !== null} />
-
-          {/* Branches stacked vertically */}
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            {branches.map((branch, i) => {
-              const isFirst = i === 0;
-              const isLast  = i === branches.length - 1;
-              const active  = activeBranch === i;
-              return (
-                <div key={i} style={{ display: 'flex', alignItems: 'center' }}>
-                  {/* T-junction connector */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 20, alignSelf: 'stretch' }}>
-                    <div style={{ width: 2, flex: isFirst ? '0 0 50%' : 1, background: isFirst ? 'transparent' : 'var(--border2)' }} />
-                    <div style={{ 
-                      width: 14, 
-                      height: 2, 
-                      background: active ? 'linear-gradient(90deg, var(--brand), var(--brand-light))' : 'var(--border2)',
-                      boxShadow: active ? '0 0 8px var(--brand)' : 'none',
-                      transition: 'all 0.3s ease'
-                    }} />
-                    <div style={{ width: 2, flex: isLast ? '0 0 50%' : 1, background: isLast ? 'transparent' : 'var(--border2)' }} />
-                  </div>
-
-                  <div style={{ padding: '10px 0', display: 'flex', alignItems: 'center', gap: 0 }}>
-                    <BranchNode
-                      branch={branch}
-                      active={active}
-                      onClick={() => {
-                        setActiveBranch(active ? null : i);
-                        onNodeClick({ ...branch, type: 'branch', title: branch.branch });
-                      }}
-                    />
-                    {active && (
-                      <>
-                        <Line length={16} dashed active />
-                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--brand)', boxShadow: '0 0 8px var(--brand)' }} />
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      {/* Level 2 — Phases (when branch selected) */}
-      {activeBranch !== null && phases.length > 0 && (
-        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', overflowX: 'auto', background: 'rgba(10, 10, 16, 0.4)', backdropFilter: 'blur(2px)', position: 'relative', zIndex: 2 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text3)', marginBottom: 14 }}>
-            {branches[activeBranch]?.branch?.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())} — Phases
-          </div>
-          <div style={{ display: 'flex', alignItems: 'flex-start', minWidth: 'max-content', gap: 0 }}>
-            {phases.map((phase, pIdx) => (
-              <React.Fragment key={pIdx}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-                  <PhaseNode
-                    name={phase.name}
-                    goal={phase.goal}
-                    taskCount={phase.tasks.length}
-                    onClick={() => onNodeClick({ type: 'phase', title: phase.name, description: phase.goal })}
-                  />
-                  {/* Tasks under phase */}
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
-                    {phase.tasks.map((task, tIdx) => (
-                      <React.Fragment key={tIdx}>
-                        <Line vertical length={10} active />
-                        {task.milestone
-                          ? <MilestoneDiamond title={task.title} onClick={() => onNodeClick({ ...task, type: 'milestone' })} />
-                          : <TaskNode
-                              task={task}
-                              isFounder={isFounder}
-                              onClick={() => onNodeClick({ ...task, type: 'task' })}
-                              onEdit={() => onTaskEdit(task)}
-                            />
-                        }
-                      </React.Fragment>
-                    ))}
-                  </div>
-                </div>
-                {pIdx < phases.length - 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', paddingBottom: 36 }}>
-                    <Line length={32} active />
-                    <ChevronRight size={12} style={{ color: 'var(--brand-light)', filter: 'drop-shadow(0 0 4px var(--brand))', flexShrink: 0 }} />
-                    <Line length={8} active />
-                  </div>
-                )}
-              </React.Fragment>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {activeBranch === null && branches.length > 0 && (
-        <div style={{ padding: '14px 24px', display: 'flex', alignItems: 'center', gap: 8, color: 'var(--text3)', fontSize: 12, position: 'relative', zIndex: 2 }}>
-          <ChevronRight size={14} /> Click any branch to expand phases and tasks
-        </div>
-      )}
+    <div style={{ height: 'calc(100vh - 180px)', minHeight: 600, borderRadius: 16, border: '1px solid var(--border2)', overflow: 'hidden', background: 'var(--bg-sub)' }}>
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        fitView
+        attributionPosition="bottom-left"
+      >
+        <Background color="var(--border2)" gap={20} />
+        <Controls />
+      </ReactFlow>
     </div>
   );
 };
@@ -741,7 +773,7 @@ const TeamModal = ({ onConfirm, onCancel, isGenerating, initialMembers = [] }) =
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 const Roadmap = () => {
-  const { user, startupDetails, roadmapData, isGeneratingRoadmap, generateRoadmap, allRoadmaps, manageSubTask, roadmapNodes } = useStartup();
+  const { user, startupDetails, roadmapData, isGeneratingRoadmap, generateRoadmap, allRoadmaps, updateSyncedTask } = useStartup();
   const { showToast } = useToast();
 
   const [showTeamModal, setShowTeamModal]   = useState(false);
@@ -807,27 +839,22 @@ const Roadmap = () => {
   };
 
   const handleTaskSave = (taskId, fields) => {
-    // Update in roadmapNodes via context manageSubTask
-    const branchNode = roadmapNodes.find(n => n.tasks?.some(t => t.id === taskId));
-    if (branchNode) {
-      // Find the member to see if their id needs to be linked
-      const selectedMember = teamMembers.find(m => m.name === fields.assignedTo);
-      const enrichedFields = {
-        ...fields,
-        assigned_member_id: selectedMember ? selectedMember.id : null,
-        assignee_role: selectedMember ? selectedMember.role : 'Founder',
-      };
-      
-      // Map status change to local completed flag
-      if (fields.depStatus === 'Done') {
-        enrichedFields.completed = true;
-      } else if (fields.depStatus) {
-        enrichedFields.completed = false;
-      }
-
-      manageSubTask(branchNode.id, 'updateField', { id: taskId, fields: enrichedFields });
-      showToast('Task updated.', 'success');
+    const selectedMember = teamMembers.find(m => m.name === fields.assignedTo);
+    const enrichedFields = {
+      ...fields,
+      assigned_member_id: selectedMember ? selectedMember.id : null,
+      assignee_role: selectedMember ? selectedMember.role : 'Founder',
+    };
+    
+    if (fields.depStatus === 'Done') {
+      enrichedFields.completed = true;
+    } else if (fields.depStatus) {
+      enrichedFields.completed = false;
     }
+
+    const dbTaskId = taskId; // the task ID usually maps to dbTaskId in synced_tasks
+    updateSyncedTask(dbTaskId, enrichedFields);
+    showToast('Task updated.', 'success');
     setEditingTask(null);
   };
 
