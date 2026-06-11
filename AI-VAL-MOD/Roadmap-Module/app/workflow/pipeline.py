@@ -99,12 +99,14 @@ async def run_roadmap_pipeline(
         branch_db_id: Optional[str] = None
 
         if profiler_db_id:
+            branch_owner = profiler_output.get("branch_owners", {}).get(r["branch"]) if profiler_output else None
             branch_db_id = write_branch(
                 profiler_id= profiler_db_id,
                 session_id=  session_id,
                 branch=      r["branch"],
                 status=      r["status"],
                 summary=     r.get("summary"),
+                assigned_to= branch_owner,
             )
             if branch_db_id and r.get("tasks"):
                 task_list = [
@@ -125,6 +127,7 @@ async def run_roadmap_pipeline(
             status=  r["status"],
             tasks=   r.get("tasks"),
             summary= r.get("summary"),
+            assigned_to= branch_owner,
             db_id=   branch_db_id,   # DB uuid so frontend can sync branch edits
         ))
 

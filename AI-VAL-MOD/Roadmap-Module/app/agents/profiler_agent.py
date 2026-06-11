@@ -17,14 +17,17 @@ class ProfilerAgent(BaseAgent):
     llm_tier    = 2
     temperature = 0.1
 
-    def run(self, startup_data: Dict, validation_context: Dict) -> Dict:
+    def run(self, startup_data: Dict, validation_context: Dict, team_members: List[Dict] = None) -> Dict:
         print(f"[{self.name}] START — '{startup_data.get('startup_name')}'")
+
+        team_str = json.dumps(team_members, indent=2) if team_members else "No specific team provided."
 
         prompt = PROFILER_PROMPT.format(
             startup_json=json.dumps(
                 {k: startup_data.get(k) for k in _FIELDS}, indent=2
             ),
             validation_summary=_build_validation_summary(validation_context),
+            team_members=team_str,
         )
 
         raw    = self._call_llm(prompt, tier=2, temperature=0.1)
@@ -38,6 +41,7 @@ class ProfilerAgent(BaseAgent):
         branches = [b for b in branches if isinstance(b, dict) and b.get("name")]
         result["prioritized_branches"] = [b["name"] for b in branches]
         result["branch_outlines"]      = {b["name"]: b.get("outline", "") for b in branches}
+        result["branch_owners"]        = {b["name"]: b.get("assigned_to", "Unassigned") for b in branches}
         result["branch_tier_map"]      = result.get("branch_tier_map") or {
             b["name"]: b.get("tier", 2) for b in branches
         }

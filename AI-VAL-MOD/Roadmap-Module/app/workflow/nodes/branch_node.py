@@ -12,11 +12,10 @@ def make_branch_node(branch: str):
             return {"branch_results": [{"branch": branch, "status": "skipped", "tasks": None, "summary": None}]}
 
         result = branch_agent.run(
-            branch=branch,
+            branch_name=branch,
             startup_data=state["startup_data"],
             profiler_output=profiler_output,
             validation_context=state.get("validation_context", {}),
-            team_members=state.get("team_members", []),
         )
         return {"branch_results": [result]}
 

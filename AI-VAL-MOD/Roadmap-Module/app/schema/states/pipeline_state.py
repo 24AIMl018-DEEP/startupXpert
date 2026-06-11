@@ -22,6 +22,7 @@ class BranchRoadmap(BaseModel):
     status:   str                   # "success" | "failed"
     tasks:    Optional[List[Dict]]  # [{title, description, timeline, priority}]
     summary:  Optional[str]
+    assigned_to: Optional[str] = None
     db_id:    Optional[str] = None  # roadmap_branches.id — for frontend DB sync
 
 
