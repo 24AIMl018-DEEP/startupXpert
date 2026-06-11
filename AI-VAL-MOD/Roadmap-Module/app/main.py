@@ -392,13 +392,12 @@ def get_my_organization_backend(user_id: str):
             .eq("user_id", user_id)\
             .order("joined_at", { "ascending": True })\
             .limit(1)\
-            .maybeSingle()\
             .execute()
         
-        if not membership or not membership.data:
+        if not membership or not membership.data or len(membership.data) == 0:
             return {"org": None, "myRole": None, "members": []}
         
-        m_data = membership.data
+        m_data = membership.data[0]
         org_id = m_data["org_id"]
         my_role = m_data["role"]
 
@@ -406,11 +405,13 @@ def get_my_organization_backend(user_id: str):
         org = supabase.table("organizations")\
             .select("id, name, domain, invite_code")\
             .eq("id", org_id)\
-            .single()\
+            .limit(1)\
             .execute()
         
-        if not org or not org.data:
+        if not org or not org.data or len(org.data) == 0:
             return {"org": None, "myRole": None, "members": []}
+            
+        org_data = org.data[0]
 
         # 3. Fetch all members
         members_res = supabase.table("org_members")\
@@ -466,7 +467,7 @@ def get_my_organization_backend(user_id: str):
             })
 
         return {
-            "org": org.data,
+            "org": org_data,
             "myRole": my_role,
             "members": enriched_members
         }
