@@ -96,6 +96,18 @@ const BranchNode = ({ branch, active, onClick }) => {
           {branch.summary}
         </div>
       )}
+      {branch.assigned_to && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5 }}>
+          <span style={{
+            fontSize: 9, fontWeight: 600, whiteSpace: 'nowrap',
+            color: 'var(--brand-light)', background: 'var(--brand-bg)',
+            border: `1px solid var(--brand-border)`, borderRadius: 99, padding: '1px 6px',
+            display: 'inline-flex', alignItems: 'center', gap: 3
+          }}>
+            <User size={8} /> {branch.assigned_to.split(' ')[0]}
+          </span>
+        </div>
+      )}
       {total > 0 && (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--text3)', marginBottom: 3 }}>
@@ -128,7 +140,7 @@ const PhaseNode = ({ name, goal, taskCount, onClick }) => (
 );
 
 // ── Task Node ─────────────────────────────────────────────────────────────────
-const TaskNode = ({ task, isFounder, onClick, onEdit }) => {
+const TaskNode = ({ task, isFounder, canEdit, onClick, onEdit }) => {
   const isMilestone = task.milestone === true;
   const isBlocked   = task.depStatus === 'Blocked' || task.status === 'Blocked';
   const isDone      = task.completed || task.status === 'Done';
@@ -185,7 +197,7 @@ const TaskNode = ({ task, isFounder, onClick, onEdit }) => {
           <span style={{ fontSize: 8, fontWeight: 700, color: 'var(--text3)', textTransform: 'uppercase' }}>{task.priority || 'Low'}</span>
         </div>
 
-        {isFounder && (
+        {(canEdit || isFounder) && (
           <button onClick={e => { e.stopPropagation(); onEdit(); }} style={{
             marginLeft: 'auto',
             width: 20, height: 20, borderRadius: 5, background: 'var(--surface3)',
@@ -579,13 +591,13 @@ const nodeTypes = {
       {data.task.milestone ? (
         <MilestoneDiamond title={data.task.title} onClick={data.onClick} />
       ) : (
-        <TaskNode task={data.task} isFounder={data.isFounder} onClick={data.onClick} onEdit={data.onEdit} />
+        <TaskNode task={data.task} isFounder={data.isFounder} canEdit={data.canEdit} onClick={data.onClick} onEdit={data.onEdit} />
       )}
     </>
   )
 };
 
-const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeClick, onTaskEdit }) => {
+const RailwayCanvas = ({ roadmapData, startupName, isFounder, currentUserMember, members, onNodeClick, onTaskEdit }) => {
   const [activeBranch, setActiveBranch] = useState(null);
 
   const branches = useMemo(() => roadmapData?.branch_roadmaps || roadmapData?.branches || [], [roadmapData]);
@@ -612,6 +624,20 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
 
     let currentY = 50;
     branches.forEach((branch, bIdx) => {
+      // Visibility Check: 
+      // Founder sees all.
+      // Branch Owner sees their branch.
+      // Intern/Employee sees the branch only if they are assigned to a task inside it.
+      const branchTasks = synced.filter(t => t.branch === branch.branch).length > 0
+        ? synced.filter(t => t.branch === branch.branch)
+        : (branch.tasks || []);
+
+      if (!isFounder) {
+        const isBranchOwner = branch.assigned_to === currentUserMember?.name;
+        const isAssignedToAnyTask = branchTasks.some(t => t.assignedTo?.includes(currentUserMember?.name) || t.assigned_to?.includes(currentUserMember?.name));
+        if (!isBranchOwner && !isAssignedToAnyTask) return; // Hide this branch entirely
+      }
+
       const isActive = activeBranch === bIdx;
       const branchId = `branch-${bIdx}`;
       
@@ -679,6 +705,13 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
 
           let taskY = currentY + 120;
           phase.tasks.forEach((task, tIdx) => {
+            // Task visibility: Interns only see tasks assigned to them.
+            const isBranchOwner = branch.assigned_to === currentUserMember?.name;
+            if (!isFounder && !isBranchOwner) {
+              const isTaskAssignee = task.assignedTo?.includes(currentUserMember?.name) || task.assigned_to?.includes(currentUserMember?.name);
+              if (!isTaskAssignee) return; // Hide this specific task
+            }
+
             const taskId = `task-${task.id || tIdx}`;
             nds.push({
               id: taskId,
@@ -687,6 +720,7 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
               data: {
                 task,
                 isFounder,
+                canEdit: isFounder || isBranchOwner,
                 onClick: () => onNodeClick({ ...task, type: task.milestone ? 'milestone' : 'task' }),
                 onEdit: () => onTaskEdit(task)
               }
@@ -720,7 +754,7 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
       });
     });
     setEdges(eds);
-  }, [roadmapData, startupName, activeBranch, isFounder, onNodeClick, onTaskEdit, branches, synced, setNodes, setEdges]);
+  }, [roadmapData, startupName, activeBranch, isFounder, currentUserMember?.name, onNodeClick, onTaskEdit, branches, synced, setNodes, setEdges]);
 
   return (
     <div style={{ height: 'calc(100vh - 180px)', minHeight: 600, borderRadius: 16, border: '1px solid var(--border2)', overflow: 'hidden', background: 'var(--bg-sub)' }}>
@@ -831,6 +865,7 @@ const Roadmap = () => {
             if (orgData.members) {
               const mapped = orgData.members.map(m => ({
                 id: m.id,
+                user_id: m.user_id,
                 name: m.full_name,
                 role: m.job_title || m.role,
                 skills: Array.isArray(m.skills) ? m.skills : [],
@@ -952,20 +987,31 @@ const Roadmap = () => {
         <div style={{ textAlign: 'center', padding: '72px 24px', background: 'var(--bg-sub)', border: '1px solid var(--border2)', borderRadius: 16 }}>
           <div style={{ width: 52, height: 52, borderRadius: '50%', border: '3px solid var(--brand)', borderTopColor: 'transparent', animation: 'spinSlow 1s linear infinite', margin: '0 auto 20px' }} />
           <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text1)', marginBottom: 6 }}>Building roadmap…</div>
-          <div style={{ fontSize: 12, color: 'var(--text2)' }}>Generating phases, milestones, and task assignments.</div>
+            <div style={{ fontSize: 12, color: 'var(--text2)' }}>Generating phases, milestones, and task assignments.</div>
         </div>
       )}
 
       {/* Canvas */}
       {displayData && !isGeneratingRoadmap && (
-        <RailwayCanvas
-          roadmapData={displayData}
-          startupName={startupDetails.startupName}
-          isFounder={isFounder}
-          members={teamMembers}
-          onNodeClick={setSelectedNode}
-          onTaskEdit={handleTaskEdit}
-        />
+        <div style={{ flex: 1 }}>
+          <RailwayCanvas
+            roadmapData={displayData}
+            startupName={startupDetails.startupName}
+            isFounder={isFounder}
+            currentUserMember={teamMembers.find(m => m.user_id === user?.userId)}
+            members={teamMembers}
+            onNodeClick={setSelectedNode}
+            onTaskEdit={isFounder ? setEditingTask : (t) => {
+              const branch = (displayData.branch_roadmaps || displayData.branches || []).find(b => b.branch === t.branch);
+              const currentUserMember = teamMembers.find(m => m.user_id === user?.userId);
+              if (branch?.assigned_to === currentUserMember?.name) {
+                setEditingTask(t);
+              } else {
+                showToast("Only the Founder or Branch Owner can edit task assignments.", "error");
+              }
+            }}
+          />
+        </div>
       )}
 
       {/* Team members */}

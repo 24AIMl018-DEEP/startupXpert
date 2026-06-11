@@ -1,7 +1,5 @@
 import os
 import json
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage, SystemMessage
 
 from services.db.reader import (
     get_startup_input,

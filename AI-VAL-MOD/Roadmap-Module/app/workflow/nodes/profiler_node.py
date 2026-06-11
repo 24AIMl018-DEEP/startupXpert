@@ -11,6 +11,7 @@ def profiler_node(state: dict) -> dict:
     result = profiler_agent.run(
         startup_data=state["startup_data"],
         validation_context=state.get("validation_context", {}),
+        team_members=state.get("team_members", []),
     )
     print(f"[Node:profiler] DONE — branches={result['prioritized_branches']}")
     return {"profiler_output": result}

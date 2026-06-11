@@ -71,13 +71,14 @@ def write_profiler(session_id: str, startup_name: str, profiler: Dict) -> Option
     return None
 
 
-def write_branch(profiler_id: str, session_id: str, branch: str, status: str, summary: Optional[str]) -> Optional[str]:
+def write_branch(profiler_id: str, session_id: str, branch: str, status: str, summary: Optional[str], assigned_to: Optional[str] = None) -> Optional[str]:
     row = _insert("roadmap_branches", {
         "profiler_id": profiler_id,
         "session_id":  session_id,
         "branch":      branch,
         "status":      status,
         "summary":     summary,
+        "assigned_to": assigned_to,
     })
     return row["id"] if row else None
 
@@ -115,7 +116,7 @@ def write_tasks(branch_id: str, tasks: List[Dict]) -> List[Dict]:
 
 def update_branch(branch_id: str, fields: Dict) -> Optional[Dict]:
     """Patch allowed fields on a roadmap_branches row."""
-    allowed = {"status", "summary"}
+    allowed = {"status", "summary", "assigned_to"}
     patch = {k: v for k, v in fields.items() if k in allowed}
     if not patch:
         return None

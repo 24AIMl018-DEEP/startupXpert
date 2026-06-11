@@ -33,6 +33,10 @@ For each branch you define:
         complex regulatory, fundraising strategy)
 - outline: 3-4 bullet points of what tasks this branch should cover,
   grounded in the validation research above.
+- assigned_to: The name of the Team Member who should own and manage this branch, based on their role and skills matching the branch topic. If no one fits, output "Need to Hire: [Role]".
+
+TEAM CONTEXT:
+{team_members}
 
 PART 3 — Branch Tier Map:
 A flat dict of branch_name → tier for quick lookup.
@@ -46,7 +50,8 @@ OUTPUT FORMAT (strict JSON only, no text outside):
     {{
       "name": "<branch_name>",
       "tier": <1|2|3>,
-      "outline": "<bullet1>\\n<bullet2>\\n<bullet3>"
+      "outline": "<bullet1>\\n<bullet2>\\n<bullet3>",
+      "assigned_to": "<Team Member Name or 'Need to Hire: Role'>"
     }}
   ],
   "branch_tier_map": {{
@@ -55,3 +60,4 @@ OUTPUT FORMAT (strict JSON only, no text outside):
   }}
 }}
 """
+

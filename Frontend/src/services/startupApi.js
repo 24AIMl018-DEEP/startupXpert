@@ -646,20 +646,32 @@ export async function getMemberTasks(userId) {
   
   if (!memberships || memberships.length === 0) return [];
   
-  const orQueries = memberships.map(m => `assigned_to.ilike.%${m.full_name}%`).join(',');
+  const branchesOrQueries = memberships.map(m => `assigned_to.ilike.%${m.full_name}%`).join(',');
+  const { data: ownedBranches } = await supabase.from('roadmap_branches').select('id').or(branchesOrQueries);
+  const branchIds = ownedBranches?.map(b => b.id) || [];
 
-  const { data: tasks } = await supabase
-    .from('roadmap_tasks')
-    .select(`
+  const taskOrQueries = memberships.map(m => `assigned_to.ilike.%${m.full_name}%`).join(',');
+
+  const selectStr = `
       id, task_id, title, description, timeline, priority,
       dep_status, complexity, cost_impact, completed_at, completion_note,
-      branch_id, assigned_to,
+      branch_id, assigned_to, created_at,
       roadmap_branches ( branch, session_id,
         roadmap_profiler ( startup_name )
       )
-    `)
-    .or(orQueries)
-    .order('created_at', { ascending: true });
+  `;
+
+  const { data: directTasks } = await supabase.from('roadmap_tasks').select(selectStr).or(taskOrQueries);
+  
+  let branchTasks = [];
+  if (branchIds.length > 0) {
+    const { data: bTasks } = await supabase.from('roadmap_tasks').select(selectStr).in('branch_id', branchIds);
+    branchTasks = bTasks || [];
+  }
+
+  const taskMap = new Map();
+  [...(directTasks || []), ...branchTasks].forEach(t => taskMap.set(t.id, t));
+  const tasks = Array.from(taskMap.values()).sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
   return (tasks || []).map(t => ({
     id: t.id,

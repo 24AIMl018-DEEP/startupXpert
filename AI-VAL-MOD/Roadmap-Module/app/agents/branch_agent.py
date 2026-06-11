@@ -17,25 +17,23 @@ class BranchAgent(BaseAgent):
     name        = "branch_agent"
     temperature = 0.3
 
-    def run(self, branch: str, startup_data: Dict, profiler_output: Dict, validation_context: Dict, team_members: list = None) -> Dict:
-        # Tier comes from profiler's decision — not hardcoded here
-        tier = profiler_output.get("branch_tier_map", {}).get(branch, 2)
-        outline = profiler_output.get("branch_outlines", {}).get(branch, "")
+    def run(self, branch_name: str, startup_data: Dict, validation_context: Dict, profiler_output: Dict) -> Dict:
+        print(f"[{self.name}] START — '{branch_name}'")
 
-        print(f"[{self.name}] START — branch='{branch}' tier={tier}")
-
-        team_str = json.dumps(team_members, indent=2) if team_members else "No specific team provided. Assign roles broadly."
+        branch_outline = profiler_output.get("branch_outlines", {}).get(branch_name, "")
+        business_type  = profiler_output.get("business_type", "Unknown")
+        tech_required  = profiler_output.get("tech_required", False)
+        tier = profiler_output.get("branch_tier_map", {}).get(branch_name, 2)
 
         prompt = BRANCH_PROMPT.format(
-            branch=branch,
+            branch=branch_name,
             startup_json=json.dumps(
                 {k: startup_data.get(k) for k in _FIELDS}, indent=2
             ),
-            business_type=profiler_output.get("business_type", ""),
-            tech_required=profiler_output.get("tech_required", False),
-            branch_outline=outline or "No outline available — generate from scratch.",
-            validation_summary=_extract_branch_signals(branch, validation_context),
-            team_members=team_str,
+            business_type=business_type,
+            tech_required=tech_required,
+            branch_outline=branch_outline or "No outline available — generate from scratch.",
+            validation_summary=_extract_branch_signals(branch_name, validation_context),
         )
 
         raw = self._call_llm(prompt, tier=tier, temperature=0.3)
