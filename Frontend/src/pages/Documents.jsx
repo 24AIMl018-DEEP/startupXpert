@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useStartup } from '../context/StartupContext';
 import { useToast } from '../context/ToastContext';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { FileText, Download, Loader, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { FileText, Download, Loader, RefreshCw, CheckCircle2, Sparkles } from 'lucide-react';
 import { generateDocument, fetchAllUserRoadmaps, fetchLatestValidatedSession } from '../services/startupApi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
