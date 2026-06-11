@@ -64,7 +64,7 @@ class BranchAgent(BaseAgent):
         elif not result.get("tasks"):
             result["tasks"] = []
 
-        print(f"[{self.name}] DONE — branch='{branch}' tier={tier} tasks={len(result.get('tasks', []))}")
+        print(f"[{self.name}] DONE — branch='{branch_name}' tier={tier} tasks={len(result.get('tasks', []))}")
         return result
 
 
