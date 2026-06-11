@@ -308,7 +308,8 @@ def add_org_member(payload: AddMemberRequest):
                 .update({
                     "full_name": payload.full_name,
                     "job_title": payload.role,
-                    "skills": payload.skills
+                    "skills": payload.skills,
+                    "email": email_clean
                 })\
                 .eq("id", existing.data[0]["id"])\
                 .execute()
@@ -324,7 +325,8 @@ def add_org_member(payload: AddMemberRequest):
             "role": "member",
             "full_name": payload.full_name,
             "job_title": payload.role,
-            "skills": payload.skills
+            "skills": payload.skills,
+            "email": email_clean
         }).execute()
         if res.data:
             return {"status": "added", "member": res.data[0]}
@@ -369,7 +371,7 @@ def get_my_organization_backend(user_id: str):
 
         # 3. Fetch all members
         members_res = supabase.table("org_members")\
-            .select("id, user_id, role, full_name, job_title, skills, joined_at")\
+            .select("id, user_id, role, full_name, job_title, skills, joined_at, email")\
             .eq("org_id", org_id)\
             .order("joined_at", { "ascending": True })\
             .execute()
@@ -406,7 +408,7 @@ def get_my_organization_backend(user_id: str):
         enriched_members = []
         for m in members:
             uid = m.get("user_id")
-            email = email_map.get(uid) or ""
+            email = email_map.get(uid) or m.get("email") or ""
             mid = m.get("id")
             enriched_members.append({
                 "id": mid,
