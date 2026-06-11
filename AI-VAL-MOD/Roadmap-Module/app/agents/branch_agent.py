@@ -41,10 +41,10 @@ class BranchAgent(BaseAgent):
         try:
             result = self._parse_json(raw)
         except ValueError:
-            print(f"[{self.name}] JSON parse failed — branch='{branch}'")
-            return {"branch": branch, "status": "failed", "tasks": None, "summary": None}
+            print(f"[{self.name}] JSON parse failed — branch='{branch_name}'")
+            return {"branch": branch_name, "status": "failed", "tasks": None, "summary": None}
 
-        result["branch"] = branch
+        result["branch"] = branch_name
         result["status"] = "success"
 
         # Flatten phases → tasks list (keeping phase + milestone metadata)
