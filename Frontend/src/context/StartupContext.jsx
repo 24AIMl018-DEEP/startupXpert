@@ -596,6 +596,54 @@ export const StartupProvider = ({ children }) => {
     showToast('Node and its branches deleted.', 'info');
   };
 
+  const updateSyncedTask = (dbTaskId, fields) => {
+    if (!dbTaskId) return;
+
+    // 1. Update local roadmapDataRaw so UI responds instantly
+    setRoadmapDataRaw(prev => {
+      if (!prev || !prev.synced_tasks) return prev;
+      const updatedTasks = prev.synced_tasks.map(t => {
+        if (t.id === dbTaskId) {
+          const mapped = { ...t };
+          if (fields.title !== undefined) mapped.title = fields.title;
+          if (fields.description !== undefined) mapped.description = fields.description;
+          if (fields.timeline !== undefined) mapped.timeline = fields.timeline;
+          if (fields.priority !== undefined) mapped.priority = fields.priority;
+          if (fields.assignedTo !== undefined) mapped.assigned_to = fields.assignedTo;
+          if (fields.assigned_member_id !== undefined) mapped.assigned_member_id = fields.assigned_member_id;
+          if (fields.assignee_role !== undefined) mapped.assignee_role = fields.assignee_role;
+          if (fields.depStatus !== undefined) mapped.dep_status = fields.depStatus;
+          if (fields.complexity !== undefined) mapped.complexity = fields.complexity;
+          if (fields.costImpact !== undefined) mapped.cost_impact = fields.costImpact;
+          if (fields.completed !== undefined) mapped.completed = fields.completed;
+          return mapped;
+        }
+        return t;
+      });
+      return { ...prev, synced_tasks: updatedTasks };
+    });
+
+    // 2. Map fields to DB column names and push via API
+    const dbFields = {};
+    if (fields.title       !== undefined) dbFields.title       = fields.title;
+    if (fields.description !== undefined) dbFields.description = fields.description;
+    if (fields.timeline    !== undefined) dbFields.timeline    = fields.timeline;
+    if (fields.priority    !== undefined) dbFields.priority    = fields.priority;
+    if (fields.assignedTo  !== undefined) dbFields.assigned_to = fields.assignedTo;
+    if (fields.assigned_member_id !== undefined) dbFields.assigned_member_id = fields.assigned_member_id;
+    if (fields.assignee_role !== undefined) dbFields.assignee_role = fields.assignee_role;
+    if (fields.depStatus   !== undefined) dbFields.dep_status  = fields.depStatus;
+    if (fields.complexity  !== undefined) dbFields.complexity  = fields.complexity;
+    if (fields.costImpact  !== undefined) dbFields.cost_impact = fields.costImpact;
+    if (fields.completed   !== undefined) dbFields.completed   = fields.completed;
+
+    if (Object.keys(dbFields).length > 0) {
+      patchTask(dbTaskId, dbFields).catch(err =>
+        console.warn('[RoadmapSync] task field update failed:', err.message)
+      );
+    }
+  };
+
   const manageSubTask = (nodeId, action, taskPayload) => {
     setRoadmapNodes(prev => prev.map(node => {
       if (node.id !== nodeId) return node;
@@ -1006,6 +1054,7 @@ export const StartupProvider = ({ children }) => {
         deleteRoadmapNode,
         manageSubTask,
         manageNote,
+        updateSyncedTask,
         generateRoadmap,
         setRoadmapNodesFromDB,
         loadRoadmapBySession: async (sessionId) => {
