@@ -4,10 +4,10 @@ import { useToast } from '../context/ToastContext';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { useNavigate } from 'react-router-dom';
 import {
-  Users, Mail, Shield, Award, Copy, Check, Plus, Loader,
+  Users, Mail, Shield, Award, Copy, Check, Plus, Loader, Trash2,
   Building2, Calendar, ClipboardList, Compass, ArrowRight, ExternalLink
 } from 'lucide-react';
-import { getMyOrganization, addOrganizationMember } from '../services/startupApi';
+import { getMyOrganization, addOrganizationMember, removeOrganizationMember } from '../services/startupApi';
 
 const getRandomGradient = (name = 'User') => {
   const hash = [...name].reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -94,6 +94,17 @@ const Team = () => {
       showToast(err.message || 'Failed to insert teammate.', 'error');
     } finally {
       setInserting(false);
+    }
+  };
+
+  const handleDeleteMember = async (memberId) => {
+    if (!window.confirm("Are you sure you want to remove this member?")) return;
+    try {
+      await removeOrganizationMember(memberId);
+      showToast('Teammate removed successfully.', 'success');
+      await fetchOrg();
+    } catch (err) {
+      showToast(err.message || 'Failed to remove teammate.', 'error');
     }
   };
 
@@ -394,6 +405,17 @@ const Team = () => {
                         }}>
                           {member.task_count || 0}
                         </span>
+                        {isFounder && (
+                          <button
+                            onClick={() => handleDeleteMember(member.id)}
+                            style={{ background: 'transparent', border: 'none', color: 'var(--red)', cursor: 'pointer', padding: '4px', borderRadius: '4px', marginLeft: 8, transition: 'background 0.15s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            title="Remove Member"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

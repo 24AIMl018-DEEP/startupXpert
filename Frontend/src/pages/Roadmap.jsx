@@ -2,10 +2,11 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useStartup } from '../context/StartupContext';
 import { useToast } from '../context/ToastContext';
 import DashboardLayout from '../layouts/DashboardLayout';
+import TaskComments from '../components/TaskComments';
 import {
   Sparkles, X, Clock, CheckCircle2, Flag, Maximize2, Minimize2,
   Trash2, Plus, Compass, Lock, User, ChevronRight, Circle,
-  Edit2, Check, Users, Shield, Crown
+  Edit2, Check, Users, Shield, Crown, AlignLeft
 } from 'lucide-react';
 
 // ── Role meta ─────────────────────────────────────────────────────────────────
@@ -392,6 +393,15 @@ const NodeDrawer = ({ node, onClose }) => {
             </div>
           )}
 
+          {node.intern_guidance && (
+            <div style={{ padding: '12px 14px', background: 'rgba(124, 93, 249, 0.08)', borderRadius: 10, border: '1px solid rgba(124, 93, 249, 0.2)' }}>
+              <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--brand-light)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <AlignLeft size={12} /> INTERN GUIDANCE
+              </div>
+              <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.6, margin: 0 }}>{node.intern_guidance}</p>
+            </div>
+          )}
+
           {/* Metadata grid */}
           {(node.priority || node.timeline || node.assignedTo || node.depStatus || node.complexity) && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -435,6 +445,11 @@ const NodeDrawer = ({ node, onClose }) => {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Task Queries / Comments */}
+          {(node.type === 'task' || node.type === 'milestone') && node.id && (
+            <TaskComments taskId={node.id} />
           )}
         </div>
       </div>

@@ -602,6 +602,15 @@ export async function addOrganizationMember(orgId, email, fullName, role, skills
   return res.json();
 }
 
+// Remove member from organization
+export async function removeOrganizationMember(memberId) {
+  const { error } = await supabase
+    .from('org_members')
+    .delete()
+    .eq('id', memberId);
+  if (error) throw new Error(error.message || 'Failed to remove member.');
+}
+
 // Join org via invite code
 export async function joinOrganization(inviteCode, userId, fullName, jobTitle, skills, email) {
   const { data: org, error } = await supabase
@@ -622,6 +631,11 @@ export async function joinOrganization(inviteCode, userId, fullName, jobTitle, s
 }
 
 // Get tasks assigned to a specific org member (for member dashboard)
+export async function fetchStartupDetailsForMember(sessionId) {
+  const { data } = await supabase.from('startup_input').select('*').eq('id', sessionId).single();
+  return data;
+}
+
 export async function getMemberTasks(userId) {
   if (!userId) return [];
   // Get all org_member records for the user
@@ -689,4 +703,39 @@ export async function deleteTask(taskId) {
     .delete()
     .eq('id', taskId);
   if (error) throw error;
+}
+
+// Get comments for a task
+export async function getTaskComments(taskId) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${ROADMAP_URL}/api/v1/tasks/${taskId}/comments`, { headers });
+  if (res.ok) return await res.json();
+  return [];
+}
+
+// Post a new comment for a task
+export async function postTaskComment(taskId, userId, message) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${ROADMAP_URL}/api/v1/tasks/${taskId}/comments`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ user_id: userId, message })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to post comment');
+  }
+  return res.json();
+}
+
+// Generate an AI document based on session context
+export async function generateDocument(sessionId, documentType) {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${ROADMAP_URL}/api/v1/documents/generate`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ session_id: sessionId, document_type: documentType })
+  });
+  if (!res.ok) throw new Error('Failed to generate document');
+  return res.text();
 }
