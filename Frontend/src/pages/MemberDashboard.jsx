@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useStartup } from '../context/StartupContext';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { CheckCircle2, Clock, AlertTriangle, Loader, ChevronDown, ChevronUp } from 'lucide-react';
-import { getMemberTasks, updateTaskStatus } from '../services/startupApi';
+import { CheckCircle2, Clock, AlertTriangle, Loader, ChevronDown, ChevronUp, Building2, AlignLeft } from 'lucide-react';
+import { getMemberTasks, updateTaskStatus, fetchStartupDetailsForMember } from '../services/startupApi';
+import TaskComments from '../components/TaskComments';
 
 const STATUS_OPTIONS = ['Pending', 'In Progress', 'Done', 'Blocked'];
 
@@ -23,11 +24,20 @@ const MemberDashboard = () => {
   const [expanded, setExpanded] = useState(null);
   const [saving,   setSaving]  = useState(null);
   const [note,     setNote]    = useState({});
+  const [startupDetails, setStartupDetails] = useState(null);
 
   const load = useCallback(async () => {
     if (!user?.userId) return;
     setLoading(true);
-    try { setTasks(await getMemberTasks(user.userId)); }
+    try { 
+      const fetchedTasks = await getMemberTasks(user.userId);
+      setTasks(fetchedTasks); 
+      if (fetchedTasks.length > 0 && fetchedTasks[0].sessionId) {
+        fetchStartupDetailsForMember(fetchedTasks[0].sessionId)
+          .then(details => setStartupDetails(details))
+          .catch(e => console.warn('Failed to fetch startup details:', e));
+      }
+    }
     catch { /* ignore */ }
     finally { setLoading(false); }
   }, [user?.userId]);
@@ -68,6 +78,24 @@ const MemberDashboard = () => {
         </div>
         <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2 }}>Tasks assigned to you across all projects.</div>
       </div>
+
+      {/* Company Overview (Read-Only) */}
+      {startupDetails && (
+        <div className="glass-card" style={{ padding: 20, marginBottom: 24, border: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <Building2 size={16} color="var(--brand)" />
+            <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text1)' }}>{startupDetails.startup_name}</span>
+            <span className="badge badge-brand">{startupDetails.current_startup_stage || 'Ideation'}</span>
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--text2)', lineHeight: 1.6, marginBottom: 12 }}>
+            {startupDetails.startup_description}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text3)', display: 'flex', gap: 16 }}>
+            <div><strong style={{ color: 'var(--text2)' }}>Domain:</strong> {startupDetails.startup_domain}</div>
+            <div><strong style={{ color: 'var(--text2)' }}>Target Audience:</strong> {startupDetails.target_audience}</div>
+          </div>
+        </div>
+      )}
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, marginBottom: 24 }}>
@@ -142,6 +170,18 @@ const MemberDashboard = () => {
                       </div>
                     )}
 
+                    {/* Intern Guidance */}
+                    {task.intern_guidance && (
+                      <div style={{ marginBottom: 16, padding: 12, background: 'rgba(124, 93, 249, 0.08)', borderRadius: 8, border: '1px solid rgba(124, 93, 249, 0.2)' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand-light)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <AlignLeft size={12} /> INTERN GUIDANCE
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>
+                          {task.intern_guidance}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Update status */}
                     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                       <div style={{ flex: 1, minWidth: 140 }}>
@@ -177,6 +217,9 @@ const MemberDashboard = () => {
                         ✓ {task.completionNote}
                       </div>
                     )}
+
+                    {/* Queries & Doubts */}
+                    <TaskComments taskId={task.id} />
                   </div>
                 )}
               </div>

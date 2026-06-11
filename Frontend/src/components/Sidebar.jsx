@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Briefcase, Clock, Settings, LogOut,
   Sparkles, Compass, User, Plus, ChevronDown,
   PanelLeftClose, PanelLeftOpen, CheckSquare, Building2,
-  BarChart2, Zap, Users
+  BarChart2, Zap, Users, FileText
 } from 'lucide-react';
 
 const NAV_FOUNDER = [
@@ -13,12 +13,14 @@ const NAV_FOUNDER = [
   { id: 'roadmap',  label: 'Roadmap',     icon: Compass,         path: '/roadmap'   },
   { id: 'team',     label: 'Team',        icon: Users,           path: '/team'      },
   { id: 'startups', label: 'My Startups', icon: Briefcase,       path: '/dashboard' },
+  { id: 'documents',label: 'Documents',   icon: FileText,        path: '/documents' },
   { id: 'history',  label: 'History',     icon: Clock,           path: '/dashboard' },
 ];
 
 const NAV_MEMBER = [
-  { id: 'member', label: 'My Tasks', icon: CheckSquare, path: '/member' },
-  { id: 'team',   label: 'Team',     icon: Users,       path: '/team'   },
+  { id: 'member',    label: 'My Tasks',  icon: CheckSquare, path: '/member' },
+  { id: 'team',      label: 'Team',      icon: Users,       path: '/team'   },
+  { id: 'documents', label: 'Documents', icon: FileText,    path: '/documents' },
 ];
 
 const Sidebar = ({ activeTab, setActiveTab, collapsed, onToggle }) => {

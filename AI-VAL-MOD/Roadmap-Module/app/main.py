@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from fastapi import Depends
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
+from fastapi.responses import StreamingResponse
 
 from schema.states.pipeline_state import RoadmapPipelineState, TeamMember
 from workflow.pipeline import run_roadmap_pipeline
@@ -136,6 +137,13 @@ class TaskUpdateRequest(BaseModel):
     blocked_by:          Optional[List[str]] = None
     unblocks:            Optional[List[str]] = None
 
+class TaskCommentRequest(BaseModel):
+    user_id: str
+    message: str
+
+class DocumentRequest(BaseModel):
+    session_id: str
+    document_type: str
 
 @app.get("/health")
 def health():
@@ -245,6 +253,41 @@ def patch_task(task_id: str, payload: TaskUpdateRequest):
         raise HTTPException(status_code=404, detail="Task not found or update failed.")
     return {"status": "updated", "task": updated}
 
+@app.get("/api/v1/tasks/{task_id}/comments")
+def get_task_comments(task_id: str):
+    from shared.db.supabase_client import get_supabase
+    supabase = get_supabase()
+    try:
+        res = supabase.table("task_comments").select("*").eq("task_id", task_id).order("created_at").execute()
+        return res.data
+    except Exception as e:
+        logger.error(f"Failed to fetch task comments: {e}")
+        return []
+
+@app.post("/api/v1/tasks/{task_id}/comments")
+def post_task_comment(task_id: str, payload: TaskCommentRequest):
+    from shared.db.supabase_client import get_supabase
+    supabase = get_supabase()
+    try:
+        res = supabase.table("task_comments").insert({
+            "task_id": task_id,
+            "user_id": payload.user_id,
+            "message": payload.message
+        }).execute()
+        if res.data:
+            return res.data[0]
+        raise HTTPException(status_code=500, detail="Failed to insert comment.")
+    except Exception as e:
+        logger.error(f"Failed to insert task comment: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/v1/documents/generate")
+async def generate_document(payload: DocumentRequest):
+    from services.document_generator import generate_document_stream
+    return StreamingResponse(
+        generate_document_stream(payload.session_id, payload.document_type), 
+        media_type="text/plain"
+    )
 
 class AddMemberRequest(BaseModel):
     org_id: str

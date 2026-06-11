@@ -15,6 +15,7 @@ import Settings from './pages/Settings';
 import Roadmap from './pages/Roadmap';
 import MemberDashboard from './pages/MemberDashboard';
 import Team from './pages/Team';
+import Documents from './pages/Documents';
 import NotFound from './pages/NotFound';
 
 // New Upgrades Routing Flow
@@ -108,6 +109,14 @@ function App() {
           element={
             <ProtectedRoute>
               <Team />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/documents" 
+          element={
+            <ProtectedRoute>
+              <Documents />
             </ProtectedRoute>
           } 
         />

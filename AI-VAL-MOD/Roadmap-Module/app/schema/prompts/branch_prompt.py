@@ -20,6 +20,7 @@ RULES:
 - phase name: short label e.g. "Foundation", "Build", "Launch", "Scale"
 - phase goal: 1 sentence — what does completing this phase achieve?
 - task title: specific + actionable, no generic words
+- NO SPOONFEEDING: Output only high-level, critical tasks (e.g. 3-5 main objectives per phase). Do NOT output 1000 micro-tasks.
 - task description: exactly 2 sentences — what to do + measurable outcome
 - timeline: realistic e.g. "Week 1-2", "Month 1", "Month 2-3"
 - priority: High / Medium / Low
