@@ -390,7 +390,7 @@ def get_my_organization_backend(user_id: str):
         membership = supabase.table("org_members")\
             .select("org_id, role, full_name, job_title, skills")\
             .eq("user_id", user_id)\
-            .order("joined_at", { "ascending": True })\
+            .order("joined_at")\
             .limit(1)\
             .execute()
         
@@ -417,7 +417,7 @@ def get_my_organization_backend(user_id: str):
         members_res = supabase.table("org_members")\
             .select("id, user_id, role, full_name, job_title, skills, joined_at, email")\
             .eq("org_id", org_id)\
-            .order("joined_at", { "ascending": True })\
+            .order("joined_at")\
             .execute()
         
         members = members_res.data or []
