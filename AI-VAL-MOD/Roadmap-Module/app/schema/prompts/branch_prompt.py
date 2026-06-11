@@ -20,11 +20,15 @@ RULES:
 - phase name: short label e.g. "Foundation", "Build", "Launch", "Scale"
 - phase goal: 1 sentence — what does completing this phase achieve?
 - task title: specific + actionable, no generic words
-- NO SPOONFEEDING: Output only high-level, critical tasks (e.g. 3-5 main objectives per phase). Do NOT output 1000 micro-tasks.
-- task description: exactly 2 sentences — what to do + measurable outcome
+- NO SPOONFEEDING for the title: Output only high-level, critical tasks (e.g. 3-5 main objectives per phase). Do NOT output 1000 micro-tasks.
+- task description (Problem Statement): Provide a HIGHLY DETAILED execution guide. Use the validation data to define the problem statement, strict rules, necessary systems, and exact expectations for the team member. Write at least 4-5 sentences formatting this as a deep context brief for the assignee.
+- assigned_to: Look at the provided TEAM context. Assign this task to the best matching team member based on their role and skills. If no current team member fits the task, output "Need to Hire: [Role]".
 - timeline: realistic e.g. "Week 1-2", "Month 1", "Month 2-3"
 - priority: High / Medium / Low
 - milestone: true only for the LAST task of each phase (phase completion checkpoint)
+
+TEAM CONTEXT:
+{team_members}
 
 OUTPUT (strict JSON only, no text outside):
 {{
@@ -37,7 +41,8 @@ OUTPUT (strict JSON only, no text outside):
       "tasks": [
         {{
           "title": "<actionable title>",
-          "description": "<2 sentences: action + outcome>",
+          "description": "<Detailed problem statement & execution rules (4-5 sentences)>",
+          "assigned_to": "<Name of Team Member or 'Need to Hire: Role'>",
           "timeline": "<Week X or Month X>",
           "priority": "<High|Medium|Low>",
           "milestone": <true|false>
