@@ -353,8 +353,8 @@ const Team = () => {
                     {/* Skills pills */}
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 16 }}>
                       {(member.skills || []).length > 0 ? (
-                        member.skills.map((skill, idx) => (
-                          <span key={idx} className="badge badge-ghost" style={{ fontSize: 9, padding: '2px 6px', border: '1px solid var(--border)' }}>
+                        [...new Set(member.skills)].map((skill, idx) => (
+                          <span key={idx} title={skill} className="badge badge-ghost" style={{ fontSize: 9, padding: '2px 6px', border: '1px solid var(--border)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {skill}
                           </span>
                         ))
