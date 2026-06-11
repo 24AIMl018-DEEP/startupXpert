@@ -588,8 +588,8 @@ const nodeTypes = {
 const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeClick, onTaskEdit }) => {
   const [activeBranch, setActiveBranch] = useState(null);
 
-  const branches = roadmapData?.branch_roadmaps || roadmapData?.branches || [];
-  const synced   = roadmapData?.synced_tasks || [];
+  const branches = useMemo(() => roadmapData?.branch_roadmaps || roadmapData?.branches || [], [roadmapData]);
+  const synced   = useMemo(() => roadmapData?.synced_tasks || [], [roadmapData]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
