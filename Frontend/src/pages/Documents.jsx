@@ -3,7 +3,7 @@ import { useStartup } from '../context/StartupContext';
 import { useToast } from '../context/ToastContext';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { FileText, Download, Loader, RefreshCw, CheckCircle2, Sparkles } from 'lucide-react';
-import { generateDocument, fetchAllUserRoadmaps, fetchLatestValidatedSession, getMemberTasks, fetchStartupDetailsForMember } from '../services/startupApi';
+import { generateDocument, fetchUserSessions, fetchLatestValidatedSession, getMemberTasks, fetchStartupDetailsForMember } from '../services/startupApi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
@@ -55,9 +55,10 @@ const Documents = () => {
     const loadSessions = async () => {
       try {
         if (user?.role === 'founder' || user?.role === 'Founder') {
-          const s = await fetchAllUserRoadmaps(user.userId);
-          setSessions(s);
-          if (s.length > 0) setSelectedSessionId(s[0].sessionId);
+          const s = await fetchUserSessions(user.userId);
+          const mapped = s.map(session => ({ sessionId: session.id, startupName: session.startup_name }));
+          setSessions(mapped);
+          if (mapped.length > 0) setSelectedSessionId(mapped[0].sessionId);
         } else {
           // Member: they only see their current org's session.
           const tasks = await getMemberTasks(user.userId);
