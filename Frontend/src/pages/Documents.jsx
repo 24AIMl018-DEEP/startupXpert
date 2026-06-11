@@ -3,7 +3,7 @@ import { useStartup } from '../context/StartupContext';
 import { useToast } from '../context/ToastContext';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { FileText, Download, Loader, RefreshCw, CheckCircle2, Sparkles } from 'lucide-react';
-import { generateDocument, fetchAllUserRoadmaps, fetchLatestValidatedSession } from '../services/startupApi';
+import { generateDocument, fetchAllUserRoadmaps, fetchLatestValidatedSession, getMemberTasks, fetchStartupDetailsForMember } from '../services/startupApi';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
@@ -60,15 +60,13 @@ const Documents = () => {
           if (s.length > 0) setSelectedSessionId(s[0].sessionId);
         } else {
           // Member: they only see their current org's session.
-          // Since members don't have user_id on startup_input, 
-          // we can just use the roadmap session if they have one. 
-          // Actually, let's just let the API handle the org logic later, 
-          // or for now, we use the session from the roadmap tasks.
-          // For simplicity, we just fetch their latest session.
-          const s = await fetchLatestValidatedSession(user.userId);
-          if (s && s.id) {
-            setSessions([{ sessionId: s.id, startupName: s.startup_name }]);
-            setSelectedSessionId(s.id);
+          const tasks = await getMemberTasks(user.userId);
+          if (tasks && tasks.length > 0 && tasks[0].sessionId) {
+            const details = await fetchStartupDetailsForMember(tasks[0].sessionId);
+            if (details) {
+              setSessions([{ sessionId: details.id, startupName: details.startup_name }]);
+              setSelectedSessionId(details.id);
+            }
           }
         }
       } catch (e) {

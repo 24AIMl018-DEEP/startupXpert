@@ -28,7 +28,7 @@ const ProtectedRoute = ({
   // Gate 1.5 — Member role restriction
   const isMember = user?.userType === 'org' && (user?.role === 'Member' || user?.role === 'member');
   if (isMember) {
-    const allowedMemberPaths = ['/member', '/profile', '/settings'];
+    const allowedMemberPaths = ['/member', '/profile', '/settings', '/team', '/documents'];
     const isAllowed = allowedMemberPaths.some(p => location.pathname.startsWith(p));
     if (!isAllowed) {
       return <Navigate to="/member" replace />;
