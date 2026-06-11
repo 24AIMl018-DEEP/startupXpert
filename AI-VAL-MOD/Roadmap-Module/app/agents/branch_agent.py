@@ -17,12 +17,14 @@ class BranchAgent(BaseAgent):
     name        = "branch_agent"
     temperature = 0.3
 
-    def run(self, branch: str, startup_data: Dict, profiler_output: Dict, validation_context: Dict) -> Dict:
+    def run(self, branch: str, startup_data: Dict, profiler_output: Dict, validation_context: Dict, team_members: list = None) -> Dict:
         # Tier comes from profiler's decision — not hardcoded here
         tier = profiler_output.get("branch_tier_map", {}).get(branch, 2)
         outline = profiler_output.get("branch_outlines", {}).get(branch, "")
 
         print(f"[{self.name}] START — branch='{branch}' tier={tier}")
+
+        team_str = json.dumps(team_members, indent=2) if team_members else "No specific team provided. Assign roles broadly."
 
         prompt = BRANCH_PROMPT.format(
             branch=branch,
@@ -33,6 +35,7 @@ class BranchAgent(BaseAgent):
             tech_required=profiler_output.get("tech_required", False),
             branch_outline=outline or "No outline available — generate from scratch.",
             validation_summary=_extract_branch_signals(branch, validation_context),
+            team_members=team_str,
         )
 
         raw = self._call_llm(prompt, tier=tier, temperature=0.3)

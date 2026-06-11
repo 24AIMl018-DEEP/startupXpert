@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import ReactFlow, { Background, Controls, Handle } from 'reactflow';
+import ReactFlow, { Background, Controls, Handle, useNodesState, useEdgesState } from 'reactflow';
+import 'reactflow/dist/style.css';
+import ReactMarkdown from 'react-markdown';
 import 'reactflow/dist/style.css';
 import { useStartup } from '../context/StartupContext';
 import { useToast } from '../context/ToastContext';
@@ -321,11 +323,26 @@ const TaskEditModal = ({ task, members, onSave, onDelete, onClose, isFounder }) 
           </div>
 
           <div>
-            <div className="field-label">Assign To</div>
-            <select value={form.assignedTo} onChange={e => setForm(p => ({ ...p, assignedTo: e.target.value }))}>
-              <option value="Unassigned">Unassigned</option>
-              {members.map(m => <option key={m.name} value={m.name}>{m.name} ({m.role})</option>)}
-            </select>
+            <div className="field-label">Assign To (Select multiple)</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+              {members.map(m => {
+                const isSelected = form.assignedTo.includes(m.name);
+                return (
+                  <button
+                    key={m.name}
+                    onClick={() => handleAssigneeToggle(m.name)}
+                    style={{
+                      padding: '4px 10px', borderRadius: 20, fontSize: 11, cursor: 'pointer', fontWeight: 600,
+                      border: isSelected ? '1px solid var(--brand)' : '1px solid var(--border2)',
+                      background: isSelected ? 'var(--brand-bg)' : 'transparent',
+                      color: isSelected ? 'var(--brand-light)' : 'var(--text2)'
+                    }}
+                  >
+                    {m.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
           
           <div>
@@ -390,8 +407,10 @@ const NodeDrawer = ({ node, onClose }) => {
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           {(node.description || node.summary) && (
             <div style={{ padding: '12px 14px', background: 'var(--brand-bg)', border: '1px solid var(--brand-border)', borderRadius: 10, borderLeft: '3px solid var(--brand)' }}>
-              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--brand-light)', marginBottom: 6 }}>Description</div>
-              <p style={{ fontSize: 12.5, color: 'var(--text1)', lineHeight: 1.7, margin: 0 }}>{node.description || node.summary}</p>
+              <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--brand-light)', marginBottom: 6 }}>Problem Statement & Execution Guide</div>
+              <div style={{ fontSize: 12.5, color: 'var(--text1)', lineHeight: 1.7, margin: 0, '& p': { margin: '0 0 10px' } }} className="prose prose-invert prose-sm">
+                <ReactMarkdown>{node.description || node.summary}</ReactMarkdown>
+              </div>
             </div>
           )}
 
@@ -572,7 +591,10 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
   const branches = roadmapData?.branch_roadmaps || roadmapData?.branches || [];
   const synced   = roadmapData?.synced_tasks || [];
 
-  const { nodes, edges } = useMemo(() => {
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
+  useEffect(() => {
     const nds = [];
     const eds = [];
     
@@ -689,14 +711,24 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, members, onNodeCli
       }
     });
 
-    return { nodes: nds, edges: eds };
-  }, [roadmapData, startupName, activeBranch, isFounder, onNodeClick, onTaskEdit, branches, synced]);
+    // Merge new positions with existing nodes if they exist to prevent reset while dragging
+    setNodes(prev => {
+      if (prev.length === 0) return nds;
+      return nds.map(n => {
+        const existing = prev.find(p => p.id === n.id);
+        return existing ? { ...n, position: existing.position } : n;
+      });
+    });
+    setEdges(eds);
+  }, [roadmapData, startupName, activeBranch, isFounder, onNodeClick, onTaskEdit, branches, synced, setNodes, setEdges]);
 
   return (
     <div style={{ height: 'calc(100vh - 180px)', minHeight: 600, borderRadius: 16, border: '1px solid var(--border2)', overflow: 'hidden', background: 'var(--bg-sub)' }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
         nodeTypes={nodeTypes}
         fitView
         attributionPosition="bottom-left"

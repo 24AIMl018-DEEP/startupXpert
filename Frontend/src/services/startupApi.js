@@ -641,23 +641,24 @@ export async function getMemberTasks(userId) {
   // Get all org_member records for the user
   const { data: memberships } = await supabase
     .from('org_members')
-    .select('id, org_id')
+    .select('id, org_id, full_name')
     .eq('user_id', userId);
   
   if (!memberships || memberships.length === 0) return [];
-  const memberIds = memberships.map(m => m.id);
+  
+  const orQueries = memberships.map(m => `assigned_to.ilike.%${m.full_name}%`).join(',');
 
   const { data: tasks } = await supabase
     .from('roadmap_tasks')
     .select(`
       id, task_id, title, description, timeline, priority,
       dep_status, complexity, cost_impact, completed_at, completion_note,
-      branch_id,
+      branch_id, assigned_to,
       roadmap_branches ( branch, session_id,
         roadmap_profiler ( startup_name )
       )
     `)
-    .in('assigned_member_id', memberIds)
+    .or(orQueries)
     .order('created_at', { ascending: true });
 
   return (tasks || []).map(t => ({
