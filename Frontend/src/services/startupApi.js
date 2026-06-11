@@ -590,7 +590,9 @@ export async function addOrganizationMember(orgId, email, fullName, role, skills
       email,
       full_name: fullName,
       role,
-      skills: Array.isArray(skills) ? skills : skills.split(',').map(s => s.trim()).filter(Boolean),
+      skills: Array.isArray(skills) 
+        ? [...new Set(skills)] 
+        : [...new Set(skills.split(',').map(s => s.trim()).filter(Boolean))],
     }),
   });
   if (!res.ok) {
