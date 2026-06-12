@@ -641,16 +641,21 @@ export async function getMemberTasks(userId) {
   // Get all org_member records for the user
   const { data: memberships } = await supabase
     .from('org_members')
-    .select('id, org_id, full_name')
+    .select('id, org_id, full_name, role, job_title')
     .eq('user_id', userId);
   
   if (!memberships || memberships.length === 0) return [];
   
-  const branchesOrQueries = memberships.map(m => `assigned_to.ilike.%${m.full_name.split(' ')[0]}%`).join(',');
-  const { data: ownedBranches } = await supabase.from('roadmap_branches').select('id').or(branchesOrQueries);
-  const branchIds = ownedBranches?.map(b => b.id) || [];
+  // Build OR queries checking name, role, and job_title
+  const orQueries = memberships.map(m => {
+    const nameMatch = `assigned_to.ilike.%${m.full_name.split(' ')[0]}%`;
+    const roleMatch = m.role ? `assigned_to.ilike.%${m.role}%` : '';
+    const jobTitleMatch = m.job_title ? `assigned_to.ilike.%${m.job_title}%` : '';
+    return [nameMatch, roleMatch, jobTitleMatch].filter(Boolean).join(',');
+  }).join(',');
 
-  const taskOrQueries = memberships.map(m => `assigned_to.ilike.%${m.full_name.split(' ')[0]}%`).join(',');
+  const { data: ownedBranches } = await supabase.from('roadmap_branches').select('id').or(orQueries);
+  const branchIds = ownedBranches?.map(b => b.id) || [];
 
   const selectStr = `
       id, task_id, title, description, timeline, priority,
@@ -661,7 +666,7 @@ export async function getMemberTasks(userId) {
       )
   `;
 
-  const { data: directTasks } = await supabase.from('roadmap_tasks').select(selectStr).or(taskOrQueries);
+  const { data: directTasks } = await supabase.from('roadmap_tasks').select(selectStr).or(orQueries);
   
   let branchTasks = [];
   if (branchIds.length > 0) {

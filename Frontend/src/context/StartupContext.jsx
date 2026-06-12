@@ -106,15 +106,13 @@ export const StartupProvider = ({ children }) => {
     import('../services/startupApi').then(async ({ fetchAllUserRoadmaps, fetchSessionRoadmap, getMyOrganization }) => {
       let targetUid = uid;
       // If user is a member, the roadmap belongs to the organization owner (Founder)
-      if (user?.userType === 'org' && (user?.role === 'Member' || user?.role === 'member')) {
-        try {
-          const orgData = await getMyOrganization(uid);
-          if (orgData && orgData.org && orgData.org.created_by) {
-            targetUid = orgData.org.created_by;
-          }
-        } catch (e) {
-          console.warn('Failed to fetch org owner id', e);
+      try {
+        const orgData = await getMyOrganization(uid);
+        if (orgData && orgData.org && orgData.org.created_by && orgData.myRole !== 'founder') {
+          targetUid = orgData.org.created_by;
         }
+      } catch (e) {
+        console.warn('Failed to fetch org owner id', e);
       }
 
       fetchAllUserRoadmaps(targetUid).then(list => {
