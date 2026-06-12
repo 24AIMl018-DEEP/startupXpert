@@ -566,7 +566,7 @@ export async function getMyOrganization(userId) {
 
   const { data: org } = await supabase
     .from('organizations')
-    .select('id, name, domain, invite_code')
+    .select('id, name, domain, invite_code, created_by')
     .eq('id', membership.org_id)
     .single();
 
