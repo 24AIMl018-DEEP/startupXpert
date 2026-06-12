@@ -103,8 +103,21 @@ export const StartupProvider = ({ children }) => {
   useEffect(() => {
     const uid = user?.userId;
     if (!isLoggedIn || !uid) return;
-    import('../services/startupApi').then(({ fetchAllUserRoadmaps, fetchSessionRoadmap }) => {
-      fetchAllUserRoadmaps(uid).then(list => {
+    import('../services/startupApi').then(async ({ fetchAllUserRoadmaps, fetchSessionRoadmap, getMyOrganization }) => {
+      let targetUid = uid;
+      // If user is a member, the roadmap belongs to the organization owner (Founder)
+      if (user?.userType === 'org' && (user?.role === 'Member' || user?.role === 'member')) {
+        try {
+          const orgData = await getMyOrganization(uid);
+          if (orgData && orgData.org && orgData.org.owner_id) {
+            targetUid = orgData.org.owner_id;
+          }
+        } catch (e) {
+          console.warn('Failed to fetch org owner id', e);
+        }
+      }
+
+      fetchAllUserRoadmaps(targetUid).then(list => {
         setAllRoadmaps(list);
         if (list.length > 0 && roadmapNodes.length === 0) {
           // Load the latest one automatically
