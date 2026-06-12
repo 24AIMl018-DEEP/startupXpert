@@ -109,8 +109,8 @@ export const StartupProvider = ({ children }) => {
       if (user?.userType === 'org' && (user?.role === 'Member' || user?.role === 'member')) {
         try {
           const orgData = await getMyOrganization(uid);
-          if (orgData && orgData.org && orgData.org.owner_id) {
-            targetUid = orgData.org.owner_id;
+          if (orgData && orgData.org && orgData.org.created_by) {
+            targetUid = orgData.org.created_by;
           }
         } catch (e) {
           console.warn('Failed to fetch org owner id', e);
