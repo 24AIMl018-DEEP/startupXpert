@@ -19,6 +19,7 @@ const NAV_FOUNDER = [
 
 const NAV_MEMBER = [
   { id: 'member',    label: 'My Tasks',  icon: CheckSquare, path: '/member' },
+  { id: 'roadmap',   label: 'Roadmap',   icon: Compass,     path: '/roadmap'   },
   { id: 'team',      label: 'Team',      icon: Users,       path: '/team'   },
   { id: 'documents', label: 'Documents', icon: FileText,    path: '/documents' },
 ];

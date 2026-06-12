@@ -72,7 +72,7 @@ const RootNode = ({ title, domain, onClick }) => (
 
 // ── Branch Node ───────────────────────────────────────────────────────────────
 const BranchNode = ({ branch, active, onClick }) => {
-  const done  = branch.tasks?.filter(t => t.completed || t.status === 'Done').length || 0;
+  const done  = branch.tasks?.filter(t => t.completed || t.status === 'Done' || t.dep_status === 'Done').length || 0;
   const total = branch.tasks?.length || 0;
   const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
   return (
@@ -142,9 +142,9 @@ const PhaseNode = ({ name, goal, taskCount, onClick }) => (
 // ── Task Node ─────────────────────────────────────────────────────────────────
 const TaskNode = ({ task, isFounder, canEdit, onClick, onEdit }) => {
   const isMilestone = task.milestone === true;
-  const isBlocked   = task.depStatus === 'Blocked' || task.status === 'Blocked';
-  const isDone      = task.completed || task.status === 'Done';
-  const isInProgress = task.depStatus === 'In Progress' || task.status === 'In Progress';
+  const isBlocked   = task.depStatus === 'Blocked' || task.status === 'Blocked' || task.dep_status === 'Blocked';
+  const isDone      = task.completed || task.status === 'Done' || task.dep_status === 'Done';
+  const isInProgress = task.depStatus === 'In Progress' || task.status === 'In Progress' || task.dep_status === 'In Progress';
   const pc          = priorityColor(task.priority);
   const rm          = roleMeta(task.assigneeRole || task.assignedTo);
 
@@ -285,8 +285,22 @@ const TaskEditModal = ({ task, members, onSave, onDelete, onClose, isFounder }) 
     description: task.description || '',
     complexity:  task.complexity || 'Low',
     costImpact:  task.costImpact || 'None',
-    depStatus:   task.depStatus || task.status || 'Ready',
+    depStatus:   task.depStatus || task.dep_status || task.status || 'Ready',
   });
+
+  const handleAssigneeToggle = (name) => {
+    setForm(p => {
+      let current = typeof p.assignedTo === 'string' ? p.assignedTo.split(',').map(s=>s.trim()).filter(Boolean) : (p.assignedTo || []);
+      current = current.filter(x => x !== 'Unassigned');
+      if (current.includes(name)) {
+         current = current.filter(x => x !== name);
+      } else {
+         current.push(name);
+      }
+      return { ...p, assignedTo: current.length > 0 ? current.join(', ') : 'Unassigned' };
+    });
+  };
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 300, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }} onClick={onClose}>
       <div style={{ width: '100%', maxWidth: 440, background: 'var(--surface)', border: '1px solid var(--border2)', borderRadius: 16, overflow: 'hidden', boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()} className="animate-scale-in">
@@ -634,8 +648,7 @@ const RailwayCanvas = ({ roadmapData, startupName, isFounder, currentUserMember,
 
       if (!isFounder) {
         const isBranchOwner = branch.assigned_to === currentUserMember?.name;
-        const isAssignedToAnyTask = branchTasks.some(t => t.assignedTo?.includes(currentUserMember?.name) || t.assigned_to?.includes(currentUserMember?.name));
-        if (!isBranchOwner && !isAssignedToAnyTask) return; // Hide this branch entirely
+        if (!isBranchOwner) return; // Hide this branch entirely
       }
 
       const isActive = activeBranch === bIdx;
@@ -890,7 +903,7 @@ const Roadmap = () => {
     const bt = synced.filter(t => t.branch === b.branch);
     return bt.length > 0 ? bt : (b.tasks || []);
   });
-  const done       = allTasks.filter(t => t.completed || t.status === 'Done').length;
+  const done       = allTasks.filter(t => t.completed || t.status === 'Done' || t.dep_status === 'Done').length;
   const pct        = allTasks.length > 0 ? Math.round((done / allTasks.length) * 100) : 0;
   const milestones = allTasks.filter(t => t.milestone).length;
 
