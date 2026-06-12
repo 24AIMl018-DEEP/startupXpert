@@ -403,7 +403,7 @@ def get_my_organization_backend(user_id: str):
 
         # 2. Fetch organization info
         org = supabase.table("organizations")\
-            .select("id, name, domain, invite_code")\
+            .select("id, name, domain, invite_code, created_by")\
             .eq("id", org_id)\
             .limit(1)\
             .execute()
