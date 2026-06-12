@@ -9,8 +9,8 @@ class ResourceAgent(BaseAgent):
     name        = "resource_allocator"
     temperature = 0.1
 
-    def run(self, tasks: List[Dict], team_members: List[Dict], business_type: str) -> List[Dict]:
-        print(f"[{self.name}] START — {len(tasks)} tasks, {len(team_members)} members")
+    def run(self, tasks: List[Dict], team_roles: List[Dict], business_type: str) -> List[Dict]:
+        print(f"[{self.name}] START — {len(tasks)} tasks, {len(team_roles)} roles")
 
         # Process in batches of 10 to stay within token limits
         BATCH_SIZE = 10
@@ -19,7 +19,7 @@ class ResourceAgent(BaseAgent):
         for i in range(0, len(tasks), BATCH_SIZE):
             batch = tasks[i:i + BATCH_SIZE]
             prompt = RESOURCE_PROMPT.format(
-                team_json=json.dumps(team_members, indent=2),
+                team_json=json.dumps(team_roles, indent=2),
                 business_type=business_type,
                 tasks_json=json.dumps(
                     [{"task_id": t["task_id"], "title": t["title"],
@@ -51,17 +51,13 @@ class ResourceAgent(BaseAgent):
                 enrich_map[e["task_id"]] = e
         for task in tasks:
             e = enrich_map.get(task["task_id"], {})
-            task["assigned_to"]     = e.get("assigned_to")
-            task["assignee_role"]   = e.get("assignee_role")
+            task["assigned_role"]   = e.get("assigned_role")
             task["estimated_hours"] = e.get("estimated_hours")
             task["complexity"]      = e.get("complexity")
             task["cost_impact"]     = e.get("cost_impact")
+            task["intern_guidance"] = e.get("intern_guidance")
 
-        workload: Dict[str, int] = {}
-        for task in tasks:
-            p = task.get("assigned_to") or "Unassigned"
-            workload[p] = workload.get(p, 0) + 1
-        print(f"[{self.name}] DONE — workload: {workload}")
+        print(f"[{self.name}] DONE — tasks enriched")
         return tasks
 
 

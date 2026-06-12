@@ -646,11 +646,11 @@ export async function getMemberTasks(userId) {
   
   if (!memberships || memberships.length === 0) return [];
   
-  const branchesOrQueries = memberships.map(m => `assigned_to.ilike.%${m.full_name}%`).join(',');
+  const branchesOrQueries = memberships.map(m => `assigned_to.ilike.%${m.full_name.split(' ')[0]}%`).join(',');
   const { data: ownedBranches } = await supabase.from('roadmap_branches').select('id').or(branchesOrQueries);
   const branchIds = ownedBranches?.map(b => b.id) || [];
 
-  const taskOrQueries = memberships.map(m => `assigned_to.ilike.%${m.full_name}%`).join(',');
+  const taskOrQueries = memberships.map(m => `assigned_to.ilike.%${m.full_name.split(' ')[0]}%`).join(',');
 
   const selectStr = `
       id, task_id, title, description, timeline, priority,
